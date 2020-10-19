@@ -7,22 +7,10 @@ using namespace std;
 
 namespace disasm {
     class scalar16_insn : public vc4_insn {
-        private:
-            string readable;
-            vector<vc4_parameter> params;
-            
         public:
-            inline scalar16_insn(string insn_name) { readable = insn_name; };
-            inline string getReadable() { return readable; };
-            inline size_t getSize() { return 16; };
-            inline vector<vc4_parameter> getParameters() {
-                return params;
-            };
-            inline scalar16_insn addParameter(vc4_parameter param) {
-                params.push_back(param);
-                return *this;
-            };
-    };
+            inline scalar16_insn(string insn_name, string format)
+                : vc4_insn(insn_name, string("{name} ")+format, 16) {};
+   };
 };
 
 #endif // __DISASM_SCALAR16_H_

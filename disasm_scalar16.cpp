@@ -8,29 +8,29 @@ namespace disasm {
         scalar16_insn *rv;
         string noargs[] = { "bkpt", "nop", "sleep", "user", "ei", "di", "cbclr",
                             "cbadd1", "cbadd2", "cbadd3", "rti" };
-        if (insn <= 10) rv = new scalar16_insn(noargs[insn]);
+        if (insn <= 10) rv = new scalar16_insn(noargs[insn], "");
         else if (((insn & 0x0020) && !(insn & 0x0040))) {
-            rv = new scalar16_insn("swi");
+            rv = new scalar16_insn("swi", "r{d}");
             vc4_parameter p(REGISTER, insn & 0x001f);
-            rv->addParameter(p);
+            rv->addParameter("d", p);
         } else if ((insn & 0x0040)) {
             vc4_parameter p(REGISTER, insn & 0x001f);
-            if (insn & 0x0020) rv = new scalar16_insn("bl");
-            else rv = new scalar16_insn("b");
-            rv->addParameter(p);
+            if (insn & 0x0020) rv = new scalar16_insn("bl", "r{d}");
+            else rv = new scalar16_insn("b", "r{d}");
+            rv->addParameter("d", p);
         } else if ((insn & 0x0080) && !(insn & 0x0040)) {
             vc4_parameter p(REGISTER, insn & 0x000F);
-            if (insn & 0x0020) rv = new scalar16_insn("switch.b");
-            else rv = new scalar16_insn("switch");
-            rv->addParameter(p);
+            if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{d}");
+            else rv = new scalar16_insn("switch", "r{d}");
+            rv->addParameter("d", p);
         } else if ((insn & 0x00D0)) {
             vc4_parameter p(REGISTER, insn & 0x001f);
-            rv = new scalar16_insn("version");
-            rv->addParameter(p);
+            rv = new scalar16_insn("version", "r{d}");
+            rv->addParameter("d", p);
         } else {
             vc4_parameter p(IMMEDIATE, insn & 0x003f);
-            rv = new scalar16_insn("swi");
-            rv->addParameter(p);
+            rv = new scalar16_insn("swi", "{u}");
+            rv->addParameter("u", p);
         }
         
         return rv;
@@ -48,49 +48,52 @@ namespace disasm {
             if ((insn & 0x0200) && !((insn & 0x0400) && (insn & 0x0800))) {
                 vc4_parameter b(REGISTER, which_b_reg(insn));
                 vc4_parameter m(REGISTER, insn & 0x001f);
-                vc4_parameter lr(REGISTER, 26); // this is actually part of
-                                                // the architecture!
-                rv = new scalar16_insn(insn&0x0080?"stm":"ldm");
-                rv->addParameter(b).addParameter(m);
-                if ((insn & 0x0100)) {
-                    rv->addParameter(lr);
-                }
+                uint8_t f = insn&0x0080;
+                string name(f?"stm":"ldm");
+                string fmt(insn&0x0100?
+                           (f?"r{b}-r{m},lr,(--sp)":f?"r{b}-r{m},lr,(sp++)"):
+                           (f?"r{b}-r{m},(--sp)":f?"r{b}-r{m},(sp++)"));
+                rv = new scalar16_insn(name, fmt);
+                rv->addParameter("b", b)->addParameter("m", m);
             } else if((insn & 0x0400) & !(insn & 0x0800)) {
                 vc4_parameter d(REGISTER, insn & 0x000F);
                 vc4_parameter o(IMMEDIATE, (insn & 0x01F) >> 4);
-                rv = new scalar16_insn(insn& 0x0200?"st":"ld");
-                rv->addParameter(d).addParameter(o);
+                rv = new scalar16_insn(insn& 0x0200?"st":"ld", "r{d}, (sp+({o}*4))");
+                rv->addParameter("d", d)->addParameter("o", o);
             } else {
                 string widths[] = { "", "h", "b", "s"};
                 string opcode(insn & 0x0100?"st":"ld");
-                opcode.append(widths[(insn & 0x0600) >> 9]);
-                rv = new scalar16_insn(opcode);
+                uint8_t w =(insn & 0x0600) >> 9;
+                opcode.append(w==0?"":(string(".") + widths[w]));
+                rv = new scalar16_insn(opcode, "r{d}, (r{s})");
                 vc4_parameter s(REGISTER, (insn & 0x00F0) >> 4);
                 vc4_parameter d(REGISTER, (insn & 0x000F));
-                rv->addParameter(s).addParameter(d);
+                rv->addParameter("s", s)->addParameter("d", d);
             }
         } else {
             if (!(insn & 0x2000)) {
                 if (insn & 0x0800) {
-                    rv = new scalar16_insn("add");
+                    rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
                     vc4_parameter d(REGISTER, insn & 0x001f);
                     vc4_parameter o(IMMEDIATE, (insn & 0x07e) >> 5);
-                    rv->addParameter(d).addParameter(o);
+                    rv->addParameter("d", d)->addParameter("o", o);
                 } else {
-                    string codes[] = { "eq", "ne", "cs", "cc", "ns", "nc", "vs",
-                                       "vc", "gt", "lte", "gte", "lt", "gt",
-                                       "lte", "always", "never" };
                     uint8_t cc = (insn & 0x0780) >> 7;
-                    rv = new scalar16_insn(string("b.").append(codes[cc]));
+                    string opcode("b.");
+                    opcode += condition_codes[cc];
+                    rv = new scalar16_insn(opcode, "$+{o}*2");
                     vc4_parameter o(IMMEDIATE, insn & 0x007f);
-                    rv->addParameter(o);
+                    rv->addParameter("o", o);
                 }
             } else {
-                rv = new scalar16_insn((insn& 0x0100)?"st":"ld");
+                rv = new scalar16_insn((insn& 0x0100)?"st":"ld",
+                                       "r{d}, r{s}+({u}*4)");
                 vc4_parameter u(IMMEDIATE, (insn & 0x0F00) >> 8);
                 vc4_parameter s(REGISTER, (insn & 0x00F0) >> 4);
                 vc4_parameter d(REGISTER, (insn & 0x000F));
-                rv->addParameter(u).addParameter(s).addParameter(d);
+                rv->addParameter("u", u)
+                    ->addParameter("s", s)
+                    ->addParameter("d", d);
             }
         }
 
@@ -101,18 +104,26 @@ namespace disasm {
 #define FIVE_BIT(x) (al_ops[((x)&0x001f)])
     
     scalar16_insn *getALRR(uint16_t insn) {
-        scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8));
+        uint8_t dc = (insn & 0x1f00) >> 8;
+        string fmt("r{d}, r{s}");
+        string add;
+        if( dc == 19 ) add = " << 1";
+        else if( dc > 20 && dc < 24 ) add = string(" << ") + std::to_string(dc - 19);
+        if (add.length() > 0) fmt += add;
+        
+        scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8), fmt);
         vc4_parameter d(REGISTER, insn & 0x000F);
         vc4_parameter s(REGISTER, (insn & 0x00F0) >> 4);
-        rv->addParameter(d).addParameter(s);
+        rv->addParameter("d", d)->addParameter("s", s);
         return rv;
     }
 
     scalar16_insn *getALRI(uint16_t insn) {
-        scalar16_insn *rv = new scalar16_insn(FOUR_BIT((insn & 0x1E00) >> 8));
+        uint8_t dc = (insn & 0x1e00) >> 8;
+        scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==11?"r{d}, r{a} << 3");
         vc4_parameter d(REGISTER, insn & 0x000F);
         vc4_parameter u(IMMEDIATE, (insn & 0x01F0) >> 4);
-        rv->addParameter(d).addParameter(u);
+        rv->addParameter("d", d)->addParameter("u", u);
         return rv;
     }
 #undef FOUR_BIT

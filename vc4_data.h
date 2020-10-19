@@ -14,6 +14,10 @@ namespace disasm {
                               "addscale", "count", "subscale", "subscale",
                               "subscale", "subscale", "subscale", "subscale",
                               "subscale", "subscale" };
+    
+    string condition_codes[] = { "eq", "ne", "cs", "cc", "ns", "nc", "vs",
+                                 "vc", "gt", "lte", "gte", "lt", "gt",
+                                 "lte", "always", "never" };
 
 }
 
