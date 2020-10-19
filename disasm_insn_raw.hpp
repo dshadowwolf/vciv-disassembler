@@ -33,7 +33,8 @@ namespace disasm {
                 p_type = type;
                 p_value = value;
             };
-            
+
+            inline vc4_parameter() {};
             inline param_type_t getType() { return p_type; };
             inline uint32_t value() { return p_value; };
     };
