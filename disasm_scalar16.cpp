@@ -1,5 +1,5 @@
 #include "disasm_scalar16.hpp"
-#include "vc4_data.h"
+#include "vc4_data.hpp"
 
 using namespace std;
 
