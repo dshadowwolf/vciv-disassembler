@@ -1,6 +1,9 @@
 #ifndef __DISASM_INSN_RAW_H_
 #define __DISASM_INSN_RAW_H_
 
+#include <boost/format.hpp>
+
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <cstdint>
@@ -83,17 +86,22 @@ namespace disasm {
             inline string toString() {
                 assert( format.length() > 0 && "No format string!");
                 string rv(format);
+                string nm("(\\{name\\})");
+                
                 for (auto it = parameters.begin(); it != parameters.end(); ++it) {
                     string item_name(it->first);
                     uint32_t i_val = it->second.value();
                     float f_val = it->second.floatValue();
                     bool flag = it->second.isFloat();
-                    
-                    regex_replace(rv,
-                                  regex("({\\s*" + it->first + "\\s*})"),
-                                  std::to_string(flag?f_val:i_val));
+                    string re_s(string("(\\{\\s*") + it->first + string("\\s*\\})"));
+                    regex fx(re_s);
+                    string fv = std::to_string(f_val);
+                    string iv((boost::format { it->second.getType()==IMMEDIATE?"0x%08x":"%d" } % i_val).str());
+                    rv = regex_replace(rv, fx, flag?fv:iv);
                 }
-                regex_replace(rv, regex("({\\s*name\\s*})"), name);
+                
+                rv = regex_replace(rv, regex(nm), name);
+
                 return rv;
             };
             inline unordered_map<string, vc4_parameter> getParameters() { return parameters; };
