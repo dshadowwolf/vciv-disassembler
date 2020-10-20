@@ -62,10 +62,9 @@ namespace disasm {
                     rv = new scalar16_insn(insn& 0x0200?"st":"ld", "r{d}, (sp+({o}*4))");
                     rv->addParameter("d", d)->addParameter("o", o);
                 } else {
-                    string widths[] = { "", "h", "b", "s"};
                     string opcode(insn & 0x0100?"st":"ld");
                     uint8_t w =(insn & 0x0600) >> 9;
-                    opcode.append(w==0?"":(string(".") + widths[w]));
+                    opcode.append(w==0?"":(string(".") + mem_op_widths[w]));
                     rv = new scalar16_insn(opcode, "r{d}, (r{s})");
                     vc4_parameter s(REGISTER, (insn & 0x00F0) >> 4);
                     vc4_parameter d(REGISTER, (insn & 0x000F));
