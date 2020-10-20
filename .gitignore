@@ -3,4 +3,5 @@ old_stuff/*
 *.o
 \#*#
 *~
+blinker01.s
 

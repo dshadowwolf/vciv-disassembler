@@ -1,0 +1,13 @@
+SCALAR48 do not decode correctly...
+  mov r1, 0x7e200004 -> mov r1, 0x7e200010
+  mov r1, 0x7e20001c -> mov r1, 0x7e200020
+  mov r2, 0x7e200028 -> mov r2, 0x7e20002c
+  mov r3, 0x00008000 -> addcmpbeq r3, r0, r0, 0
+
+SCALAR16 and SCALAR32 also not always properly decoding
+  -> mov r0, 0   -> mov reg-get decoded
+  -> add r0, 1   -> mul reg-reg
+  -> bne <label> -> ld r12, (r15)
+  -> bra <label> -> st.s r2, (r7)
+
+VECTOR48 and VECTOR80 implementations
