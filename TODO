@@ -5,6 +5,7 @@ SCALAR16 and SCALAR32 also not always properly decoding
   -> mov r0, 0   -> mov reg-reg decoded instead of mov reg-imm
     -> fixed, was a copypasta
   -> add r0, 1   -> mul reg-reg
+    -> fixed, Herman's notes were correct, I had f*cked up the initial shift
     -> fixed, Herman's notes on encoding were incorrect
     -> if we adjust the 4-bit instruction to add the padding he notes
        we get a 000100 for the 6-bit form of the instruction - mul - instead

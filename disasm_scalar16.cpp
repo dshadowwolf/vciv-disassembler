@@ -100,7 +100,7 @@ namespace disasm {
             return rv;
         }
 
-#define FOUR_BIT(x) (al_ops[((x)&0x000f)])
+#define FOUR_BIT(x) (al_ops[((x)&0x000f) << 1])
 #define FIVE_BIT(x) (al_ops[((x)&0x001f)])
     
         scalar16_insn *getALRR(uint16_t insn) {
@@ -118,8 +118,8 @@ namespace disasm {
         }
 
         scalar16_insn *getALRI(uint16_t insn) {
-            uint8_t dc = (insn & 0x1e00) >> 8;
-            scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==11?"r{d}, {u} << 3":"r{d}, {u}");
+            uint8_t dc = (insn & 0x1e00) >> 9;
+            scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==3?"r{d}, {u} << 3":"r{d}, {u}");
             vc4_parameter d(REGISTER, insn & 0x000F);
             vc4_parameter u(IMMEDIATE, (insn & 0x01F0) >> 4);
             rv->addParameter("d", d)->addParameter("u", u);
