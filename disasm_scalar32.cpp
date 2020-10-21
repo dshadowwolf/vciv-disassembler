@@ -315,9 +315,11 @@ namespace disasm {
             // certain bit-patterns
             uint16_t insn_raw_high = (uint16_t)(*((uint16_t *)buffer));
             uint16_t insn_raw_low = (uint16_t)(*((uint16_t *)(buffer+2)));
-            uint32_t insn_raw = insn_raw_high << 16 + insn_raw_low;
-            uint8_t insn_type = insn_raw >> 28 & 0x80;
-
+            uint32_t insn_raw = insn_raw_high;
+            insn_raw <<= 16;
+            insn_raw |= insn_raw_low;
+            uint8_t insn_type = insn_raw >> 28 & 0x03;
+            
             switch( insn_type ) {
                 case 0:
                     return addCmpBr(insn_raw);

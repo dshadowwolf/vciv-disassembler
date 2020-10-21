@@ -1,12 +1,14 @@
 SCALAR48 do not decode correctly...
-  mov r1, 0x7e200004 -> mov r1, 0x7e200010
-  mov r1, 0x7e20001c -> mov r1, 0x7e200020
-  mov r2, 0x7e200028 -> mov r2, 0x7e20002c
-  mov r3, 0x00008000 -> addcmpbeq r3, r0, r0, 0
-
+  -> fixed
+  
 SCALAR16 and SCALAR32 also not always properly decoding
-  -> mov r0, 0   -> mov reg-get decoded
+  -> mov r0, 0   -> mov reg-reg decoded instead of mov reg-imm
+    -> fixed, was a copypasta
   -> add r0, 1   -> mul reg-reg
+    -> fixed, Herman's notes on encoding were incorrect
+    -> if we adjust the 4-bit instruction to add the padding he notes
+       we get a 000100 for the 6-bit form of the instruction - mul - instead
+       of the expect 000010 of add
   -> bne <label> -> ld r12, (r15)
   -> bra <label> -> st.s r2, (r7)
 

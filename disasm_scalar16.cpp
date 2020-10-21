@@ -1,6 +1,8 @@
 #include "disasm_scalar16.hpp"
 #include "vc4_data.hpp"
 
+#include <iostream>
+
 using namespace std;
 
 namespace disasm {
@@ -100,7 +102,7 @@ namespace disasm {
             return rv;
         }
 
-#define FOUR_BIT(x) (al_ops[((x)&0x000f) << 1])
+#define FOUR_BIT(x) (al_ops[((x)&0x000f)])
 #define FIVE_BIT(x) (al_ops[((x)&0x001f)])
     
         scalar16_insn *getALRR(uint16_t insn) {
@@ -110,7 +112,6 @@ namespace disasm {
             if( dc == 19 ) add = " << 1";
             else if( dc > 20 && dc < 24 ) add = string(" << ") + std::to_string(dc - 19);
             if (add.length() > 0) fmt += add;
-        
             scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8), fmt);
             vc4_parameter d(REGISTER, insn & 0x000F);
             vc4_parameter s(REGISTER, (insn & 0x00F0) >> 4);
@@ -120,7 +121,7 @@ namespace disasm {
 
         scalar16_insn *getALRI(uint16_t insn) {
             uint8_t dc = (insn & 0x1e00) >> 8;
-            scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==11?"r{d}, r{a} << 3":"r{d}, r{a}");
+            scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==11?"r{d}, {u} << 3":"r{d}, {u}");
             vc4_parameter d(REGISTER, insn & 0x000F);
             vc4_parameter u(IMMEDIATE, (insn & 0x01F0) >> 4);
             rv->addParameter("d", d)->addParameter("u", u);
