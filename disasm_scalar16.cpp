@@ -1,8 +1,6 @@
 #include "disasm_scalar16.hpp"
 #include "vc4_data.hpp"
 
-#include <iostream>
-
 using namespace std;
 
 namespace disasm {
@@ -134,12 +132,30 @@ namespace disasm {
             return insn&0x6000?getALRI(insn):getALRR(insn);
         }
 
+        scalar16_insn *getAddOrBranch(uint16_t insn) {
+            scalar16_insn *rv;
+            if (insn & 0x0800) {
+                uint8_t cc_r = (insn & 0x0780) >> 7;
+                string cc(condition_codes[cc_r]);
+                rv = new scalar16_insn(string("b")+cc, "$+({o}*2)");
+                rv->addParameter("o", vc4_parameter(IMMEDIATE, insn & 0x007f));
+            } else {
+                vc4_parameter d(REGISTER, insn & 0x001f);
+                vc4_parameter o(IMMEDIATE, (insn >> 5) & 0x003f);
+                rv = new scalar16_insn("add", "r{d}, sp, ({o}*4)");
+                rv->addParameter("d", d)->addParameter("o", o);
+            }
+
+            return rv;
+        }
+        
         scalar16_insn *getInstruction(uint8_t *buffer) {
             // read the instruction and check the type
             // this should be possible by checking for
             // certain bit-patterns
             uint16_t insn_raw = (uint16_t)(*((uint16_t *)buffer));
             if ( (insn_raw & 0xFF00) == 0 ) return getSimpleInsn(insn_raw);
+            else if ( (insn_raw & 0x1000) && !(insn_raw & 0x4000) ) return getAddOrBranch(insn_raw);
             else if ( (insn_raw & 0x4000) == 0 ) return getMemoryOperation(insn_raw);
             else return getArithLogical(insn_raw);
         }
