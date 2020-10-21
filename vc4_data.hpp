@@ -20,7 +20,7 @@ namespace disasm {
     
     const string condition_codes[] = { "eq", "ne", "cs", "cc", "ns", "nc", "vs",
                                  "vc", "gt", "lte", "gte", "lt", "gt",
-                                 "lte", "always", "never" };
+                                 "lte", "ra", ".never" };
     const string mem_op_widths[] = { "", "h", "b", "s"};
 
     const string float_ops[] = { "fadd", "fsub", "fmul", "fabs", "frsub",
