@@ -11,5 +11,8 @@ SCALAR16 and SCALAR32 also not always properly decoding
        of the expect 000010 of add
   -> bne <label> -> ld r12, (r15)
   -> bra <label> -> st.s r2, (r7)
+    -> @dshadowwolf goofed and forgot to add a check for `& 0x0100 && !&0x0400`
+    -> this caused an `add rd, sp, o*4` and the `b<cc>` decoding for
+       scalar16 instructions to be lost and default to deeper memory ops
 
 VECTOR48 and VECTOR80 implementations
