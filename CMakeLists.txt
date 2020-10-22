@@ -18,7 +18,8 @@ set(Boost_USE_RELEASE_LIBS ON)
 find_package(Boost 1.67.0 REQUIRED)
 
 include_directories(${Boost_INCLUDE_DIRS})
-target_link_libraries(VCIV_DIS ${Boost_LIBRARIES})
+# we're not using any libs, just header-only implementations
+# target_link_libraries(disasm_test ${Boost_LIBRARIES})
 
 
 TEST_BIG_ENDIAN(IS_BE)
