@@ -38,29 +38,19 @@ namespace disasm {
                 assert( format.length() > 0 && "No format string!");
                 string rv(format);
                 string nm("(\\{name\\})");
+
+                if(parameters.size() <= 0) return name;
                 
                 for (auto it = parameters.begin(); it != parameters.end(); ++it) {
                     string item_name(it->first);
                     vc4_parameter p = it->second;
-                    uint32_t iv;
-                    float fv;
-                    try {
-                        iv = p.value<uint32_t>();
-                        fv = p.value<float>();
-                    } catch( const std::bad_any_cast &e ) {
-                        string emsg("Error fetching value from std::any - type <<");
-                        emsg += p.getContainedType();
-                        emsg += ">>";
-                        emsg += e.what();
-                        assert(emsg.c_str());
-                    }
-                    
-                    bool isFloat = iv==fv?true:false;
                     string outs;
-                    if(isFloat) outs = std::to_string(fv);
-                    else if ( p.getType() == ParameterTypes::IMMEDIATE ) {
-                        outs = (boost::format { "0x%08X" } % iv).str();
-                    } else outs = std::to_string(iv);
+                    
+                    if (p.getContainedType() == "i" || p.getContainedType() == "j") {
+                        if (p.getType() == ParameterTypes::IMMEDIATE)
+                            outs = (boost::format { "0x%08X" } % p.value<int>()).str();
+                        else outs = std::to_string(p.value<int>());
+                    } else outs = std::to_string(p.value<float>());
                     
                     string re_s(string("(\\{\\s*") + it->first + string("\\s*\\})"));
                     regex fx(re_s);

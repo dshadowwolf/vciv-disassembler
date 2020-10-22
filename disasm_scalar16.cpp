@@ -1,5 +1,4 @@
 #include <string>
-#include <any>
 
 #include "disasm_scalar16.hpp"
 #include "vc4_data.hpp"
@@ -17,29 +16,24 @@ namespace disasm {
             if (insn <= 10) rv = new scalar16_insn(noargs[insn], "");
             else if (((insn & 0x0020) && !(insn & 0x0040))) {
                 rv = new scalar16_insn("swi", "r{d}");
-                argv = (insn & 0x001f);
-                vc4_parameter p(ParameterTypes::REGISTER, argv);
+                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x001f);
                 rv->addParameter("d", p);
             } else if ((insn & 0x0040)) {
-                argv = (insn & 0x001f);
-                vc4_parameter p(ParameterTypes::REGISTER, argv);
+                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x001f);
                 if (insn & 0x0020) rv = new scalar16_insn("bl", "r{d}");
                 else rv = new scalar16_insn("b", "r{d}");
                 rv->addParameter("d", p);
             } else if ((insn & 0x0080) && !(insn & 0x0040)) {
-                argv = (insn & 0x000f);
-                vc4_parameter p(ParameterTypes::REGISTER, argv);
+                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x000f);
                 if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{d}");
                 else rv = new scalar16_insn("switch", "r{d}");
                 rv->addParameter("d", p);
             } else if ((insn & 0x00D0)) {
-                argv = (insn & 0x001f);
-                vc4_parameter p(ParameterTypes::REGISTER, argv);
+                vc4_parameter p(ParameterTypes::REGISTER, 0x001f);
                 rv = new scalar16_insn("version", "r{d}");
                 rv->addParameter("d", p);
             } else {
-                argv = (insn & 0x003f);
-                vc4_parameter p(ParameterTypes::REGISTER, argv);
+                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x003f);
                 rv = new scalar16_insn("swi", "{u}");
                 rv->addParameter("u", p);
             }
@@ -54,14 +48,11 @@ namespace disasm {
     
         scalar16_insn *getMemoryOperation(uint16_t insn) {
             scalar16_insn *rv;
-            std::any bv, mv, dv, ov, sv, uv;
             
             if (!(insn & 0x1000 && insn & 0x2000)) {
                 if ((insn & 0x0200) && !((insn & 0x0400) && (insn & 0x0800))) {
-                    bv = which_b_reg(insn);
-                    mv = insn & 0x001f;
-                    vc4_parameter b(ParameterTypes::REGISTER, bv);
-                    vc4_parameter m(ParameterTypes::REGISTER, mv);
+                    vc4_parameter b(ParameterTypes::REGISTER, which_b_reg(insn));
+                    vc4_parameter m(ParameterTypes::REGISTER, insn & 0x001f);
                     uint8_t f = insn&0x0080;
                     string name(f?"stm":"ldm");
                     string fmt(insn&0x0100?
@@ -70,10 +61,8 @@ namespace disasm {
                     rv = new scalar16_insn(name, fmt);
                     rv->addParameter("b", b)->addParameter("m", m);
                 } else if((insn & 0x0400) & !(insn & 0x0800)) {
-                    dv = insn & 0x000F;
-                    ov = ((insn & 0x01F0) >> 4);
-                    vc4_parameter d(ParameterTypes::REGISTER, dv);
-                    vc4_parameter o(ParameterTypes::IMMEDIATE, ov);
+                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
+                    vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x01f0) >> 4);
                     rv = new scalar16_insn(insn& 0x0200?"st":"ld", "r{d}, (sp+({o}*4))");
                     rv->addParameter("d", d)->addParameter("o", o);
                 } else {
@@ -82,39 +71,31 @@ namespace disasm {
                     opcode.append(w==0?"":(string(".") + mem_op_widths[w]));
                     rv = new scalar16_insn(opcode, "r{d}, (r{s})");
 
-                    sv = (insn & 0x00F0) >> 4;
-                    dv = insn & 0x000F;
-                    vc4_parameter s(ParameterTypes::REGISTER, sv);
-                    vc4_parameter d(ParameterTypes::REGISTER, dv);
+                    vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
+                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
                     rv->addParameter("s", s)->addParameter("d", d);
                 }
             } else {
                 if (!(insn & 0x2000)) {
                     if (insn & 0x0800) {
-                        dv = insn & 0x001f;
-                        ov = (insn & 0x07e0) >> 5;
                         rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
-                        vc4_parameter d(ParameterTypes::REGISTER, dv);
-                        vc4_parameter o(ParameterTypes::IMMEDIATE, ov);
+                        vc4_parameter d(ParameterTypes::REGISTER, insn & 0x001f);
+                        vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x07e0) >> 5);
                         rv->addParameter("d", d)->addParameter("o", o);
                     } else {
                         uint8_t cc = (insn & 0x0780) >> 7;
                         string opcode("b.");
                         opcode += condition_codes[cc];
                         rv = new scalar16_insn(opcode, "$+{o}*2");
-                        ov = insn & 0x007f;
-                        vc4_parameter o(ParameterTypes::IMMEDIATE, ov);
+                        vc4_parameter o(ParameterTypes::IMMEDIATE, insn & 0x007f);
                         rv->addParameter("o", o);
                     }
                 } else {
                     rv = new scalar16_insn((insn& 0x0100)?"st":"ld",
                                            "r{d}, r{s}+({u}*4)");
-                    uv = (insn & 0x0F00) >> 8;
-                    sv = (insn & 0x00F0) >> 4;
-                    dv = insn & 0x000F;
-                    vc4_parameter u(ParameterTypes::IMMEDIATE, uv);
-                    vc4_parameter s(ParameterTypes::REGISTER, sv);
-                    vc4_parameter d(ParameterTypes::REGISTER, dv);
+                    vc4_parameter u(ParameterTypes::IMMEDIATE, (insn & 0x0f00) >> 8 );
+                    vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
+                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
                     rv->addParameter("u", u)
                         ->addParameter("s", s)
                         ->addParameter("d", d);
@@ -136,10 +117,8 @@ namespace disasm {
             if (add.length() > 0) fmt += add;
             scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8), fmt);
 
-            std::any dv = insn & 0x000f;
-            std::any sv = (insn & 0x00f0) >> 4;
-            vc4_parameter d(ParameterTypes::REGISTER, dv);
-            vc4_parameter s(ParameterTypes::REGISTER, sv);
+            vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
+            vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
             rv->addParameter("d", d)->addParameter("s", s);
             return rv;
         }
@@ -147,10 +126,8 @@ namespace disasm {
         scalar16_insn *getALRI(uint16_t insn) {
             uint8_t dc = (insn & 0x1e00) >> 9;
             scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==3?"r{d}, {u} << 3":"r{d}, {u}");
-            std::any dv = insn & 0x000F;
-            std::any uv = (insn & 0x01F0) >> 4;
-            vc4_parameter d(ParameterTypes::REGISTER, dv);
-            vc4_parameter u(ParameterTypes::IMMEDIATE, uv);
+            vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
+            vc4_parameter u(ParameterTypes::IMMEDIATE, (insn & 0x1f0) >> 4);
             rv->addParameter("d", d)->addParameter("u", u);
             return rv;
         }
@@ -163,20 +140,15 @@ namespace disasm {
 
         scalar16_insn *getAddOrBranch(uint16_t insn) {
             scalar16_insn *rv;
-            std::any ov;
             
             if (insn & 0x0800) {
                 uint8_t cc_r = (insn & 0x0780) >> 7;
                 string cc(condition_codes[cc_r]);
-                rv = new scalar16_insn(string("b")+cc, "$+({o}*2)");
-                ov = insn & 0x007f;
-                rv->addParameter("o", vc4_parameter(ParameterTypes::IMMEDIATE, ov));
+                rv = new scalar16_insn(string("b")+cc, "$+({o}*2)");                
+                rv->addParameter("o", vc4_parameter(ParameterTypes::IMMEDIATE, insn & 0x007f));
             } else {
-                std::any dv = insn & 0x001f;
-                ov = (insn >> 5) & 0x003f;
-                
-                vc4_parameter d(ParameterTypes::REGISTER, dv);
-                vc4_parameter o(ParameterTypes::IMMEDIATE, ov);
+                vc4_parameter d(ParameterTypes::REGISTER, insn & 0x001f);
+                vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x03f0) >> 5);
                 rv = new scalar16_insn("add", "r{d}, sp, ({o}*4)");
                 rv->addParameter("d", d)->addParameter("o", o);
             }

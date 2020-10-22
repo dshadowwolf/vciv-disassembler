@@ -63,6 +63,7 @@ namespace disasm {
             inline ParameterTypes getType() { return _type; };
             inline std::string getTypeName() { return _type._to_string(); };
             inline std::string getContainedType() { return _value.type().name(); };
+            inline std::any getContainer() { return _value; };
             
             template <typename T> T value() {
                 T rr;
