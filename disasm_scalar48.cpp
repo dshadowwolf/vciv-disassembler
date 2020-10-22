@@ -1,3 +1,4 @@
+#include <disasm_config.h>
 #include "disasm_scalar48.hpp"
 #include "vc4_data.hpp"
 #include "vc4_parameter.hpp"
@@ -82,8 +83,8 @@ namespace disasm {
             // SCALAR48 is a little-endian 16 bit word followed by
             // a little-endian 32-bit word and not a series of 16 bit
             // little endian words
-            uint16_t insn = (uint16_t)(*((uint16_t *)(buffer)));
-            uint32_t insn_arg = (uint32_t)(*((uint32_t *)(buffer + 2)));
+            uint16_t insn = READ_WORD(buffer);
+            uint32_t insn_arg = READ_DWORD_X(buffer+2);
 
             uint32_t check = (insn >> 10) & 0x000003;
             switch (check) {

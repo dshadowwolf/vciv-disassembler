@@ -1,3 +1,4 @@
+#include <disasm_config.h>
 #include "disasm_scalar32.hpp"
 #include "vc4_data.hpp"
 #include "vc4_parameter.hpp"
@@ -314,11 +315,7 @@ namespace disasm {
             // read the instruction and check the type
             // this should be possible by checking for
             // certain bit-patterns
-            uint16_t insn_raw_high = (uint16_t)(*((uint16_t *)buffer));
-            uint16_t insn_raw_low = (uint16_t)(*((uint16_t *)(buffer+2)));
-            uint32_t insn_raw = insn_raw_high;
-            insn_raw <<= 16;
-            insn_raw |= insn_raw_low;
+            uint32_t insn_raw = READ_DWORD(buffer);
             uint8_t insn_type = insn_raw >> 28 & 0x03;
             
             switch( insn_type ) {

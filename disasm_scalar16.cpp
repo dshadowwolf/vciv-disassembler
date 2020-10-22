@@ -1,5 +1,6 @@
 #include <string>
 
+#include <disasm_config.h>
 #include "disasm_scalar16.hpp"
 #include "vc4_data.hpp"
 #include "vc4_parameter.hpp"
@@ -160,7 +161,7 @@ namespace disasm {
             // read the instruction and check the type
             // this should be possible by checking for
             // certain bit-patterns
-            uint16_t insn_raw = (uint16_t)(*((uint16_t *)buffer));
+            uint16_t insn_raw = READ_WORD(buffer);//(uint16_t)(*((uint16_t *)buffer));
             if ( (insn_raw & 0xFF00) == 0 ) return getSimpleInsn(insn_raw);
             else if ( (insn_raw & 0x1000) && !(insn_raw & 0x4000) ) return getAddOrBranch(insn_raw);
             else if ( (insn_raw & 0x4000) == 0 ) return getMemoryOperation(insn_raw);
