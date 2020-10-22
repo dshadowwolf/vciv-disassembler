@@ -17,3 +17,7 @@ SCALAR16 and SCALAR32 also not always properly decoding
        scalar16 instructions to be lost and default to deeper memory ops
 
 VECTOR48 and VECTOR80 implementations
+  - VECTOR48 has a basic implementation, but no test available
+  
+-- Math system and tracking of program segment and locations for use in offset calculations
+  -- perhaps a flag in the vc4_parameter result for such - maybe a second type flag for "needs calc" and then a simple expression evaluator ?
