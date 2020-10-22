@@ -12,60 +12,11 @@
 // #define NDEBUG
 #include <cassert>
 
+#include "vc4_parameter.hpp"
+
 using namespace std;
 
 namespace disasm {
-
-    typedef enum param_type_e : uint8_t {
-      REGISTER = 0,
-      MEMORY,
-      OFFSET,
-      CC,
-      SIZE_CODE,
-      IMMEDIATE,
-      ERROR
-    } param_type_t;
-
-    class vc4_parameter {
-        private:
-            param_type_t p_type = ERROR;
-            uint32_t p_value = 0;
-            float _f_val = 0.0f;
-            bool is_float = false;
-            
-            inline float float6(uint32_t imm) {
-                uint32_t b = 0;
-                if (imm & 0x20) {
-                    b |= 0x80000000;
-                }
-                int exponent = (imm >> 2) & 0x7;
-                if (exponent != 0) {
-                    b |= (exponent + 124) << 23;
-                    int mantissa = imm & 0x3;
-                    b |= mantissa << 21;
-                }
-                return *(float *)&b;
-            };
-            
-        public:
-            inline vc4_parameter( param_type_t type, uint32_t value ) {
-                p_type = type;
-                p_value = value;
-            };
-
-            inline vc4_parameter( param_type_t type, uint32_t value, bool do_float ) {
-                p_type = type;
-                _f_val = float6(value);
-                is_float = do_float;
-                p_value = value;
-            };
-            
-            inline vc4_parameter() {};
-            inline param_type_t getType() { return p_type; };
-            inline uint32_t value() { return is_float?0:p_value; };
-            inline float floatValue() { return is_float?_f_val:0.0F; };
-            inline bool isFloat() { return is_float; };
-    };
         
     class vc4_insn {
         protected:
@@ -90,14 +41,30 @@ namespace disasm {
                 
                 for (auto it = parameters.begin(); it != parameters.end(); ++it) {
                     string item_name(it->first);
-                    uint32_t i_val = it->second.value();
-                    float f_val = it->second.floatValue();
-                    bool flag = it->second.isFloat();
+                    vc4_parameter p = it->second;
+                    uint32_t iv;
+                    float fv;
+                    try {
+                        iv = p.value<uint32_t>();
+                        fv = p.value<float>();
+                    } catch( const std::bad_any_cast &e ) {
+                        string emsg("Error fetching value from std::any - type <<");
+                        emsg += p.getContainedType();
+                        emsg += ">>";
+                        emsg += e.what();
+                        assert(emsg.c_str());
+                    }
+                    
+                    bool isFloat = iv==fv?true:false;
+                    string outs;
+                    if(isFloat) outs = std::to_string(fv);
+                    else if ( p.getType() == ParameterTypes::IMMEDIATE ) {
+                        outs = (boost::format { "0x%08X" } % iv).str();
+                    } else outs = std::to_string(iv);
+                    
                     string re_s(string("(\\{\\s*") + it->first + string("\\s*\\})"));
                     regex fx(re_s);
-                    string fv = std::to_string(f_val);
-                    string iv((boost::format { it->second.getType()==IMMEDIATE?"0x%08x":"%d" } % i_val).str());
-                    rv = regex_replace(rv, fx, flag?fv:iv);
+                    rv = regex_replace(rv, fx, outs);
                 }
                 
                 rv = regex_replace(rv, regex(nm), name);
@@ -106,7 +73,7 @@ namespace disasm {
             };
             inline unordered_map<string, vc4_parameter> getParameters() { return parameters; };
             inline vc4_insn *addParameter(string name, vc4_parameter p0) {
-                parameters[name] = p0;
+                parameters.insert( std::pair<std::string, vc4_parameter>(name, p0) );
                 return this;
             };
     };

@@ -1,5 +1,6 @@
 #include "disasm_scalar48.hpp"
 #include "vc4_data.hpp"
+#include "vc4_parameter.hpp"
 
 using namespace std;
 
@@ -7,7 +8,7 @@ namespace disasm {
     namespace scalar48 {
         scalar48_insn *get_simple(uint8_t chk, uint32_t insn, uint32_t param) {
             scalar48_insn *rv;
-            vc4_parameter pp(IMMEDIATE, param);
+            vc4_parameter pp(ParameterTypes::IMMEDIATE, param);
             if (chk == 0) {
                 string lops[][3] = { {"j", "{u}", "u" }, {"b", "$+{o}", "o" },
                                   {"jl", "{u}", "u"}, {"bl", "$+{o}", "o"} };
@@ -22,7 +23,7 @@ namespace disasm {
                     case 5:
                         do {
                             // this is the simplest of the complex "simples"
-                            vc4_parameter d(REGISTER, (insn | 0xffe0) & 0x001f);
+                            vc4_parameter d(ParameterTypes::REGISTER, (insn | 0xffe0) & 0x001f);
                             rv = new scalar48_insn("add", "r{d}, pc, {o}");
                             rv->addParameter("d", d)->addParameter("o", pp);
                             return rv;
@@ -33,9 +34,9 @@ namespace disasm {
                             // addressing and a limited width on the parameter
                             // as it steals some bits to encode the source
                             // and destination
-                            vc4_parameter d(REGISTER, (insn | 0xffe0) & 0x001f);
-                            vc4_parameter s(REGISTER, ((param >> 27) | 0xffffffe0) & 0x0000001f);
-                            vc4_parameter o(IMMEDIATE, (param | 0xe0000000) & 0x1fffffff);
+                            vc4_parameter d(ParameterTypes::REGISTER, (insn | 0xffe0) & 0x001f);
+                            vc4_parameter s(ParameterTypes::REGISTER, ((param >> 27) | 0xffffffe0) & 0x0000001f);
+                            vc4_parameter o(ParameterTypes::IMMEDIATE, (param | 0xe0000000) & 0x1fffffff);
                             string w(mem_op_widths[((insn >> 6) | 0xfffffffc) & 3]);
                             uint8_t b = ((insn >> 5) | 0xfffffffe) & 0x00000001;
                             string opc(b?"st":"ld");
@@ -47,8 +48,8 @@ namespace disasm {
                         } while(0);
                     case 7:
                         do {
-                            vc4_parameter d(REGISTER, (insn | 0xffe0) & 0x001f);
-                            vc4_parameter o(IMMEDIATE, (param | 0xe0000000) & 0x1fffffff);
+                            vc4_parameter d(ParameterTypes::REGISTER, (insn | 0xffe0) & 0x001f);
+                            vc4_parameter o(ParameterTypes::IMMEDIATE, (param | 0xe0000000) & 0x1fffffff);
                             string w(mem_op_widths[((insn >> 6) | 0xfffffffc) & 3]);
                             uint8_t b = ((insn >> 5) | 0xfffffffe) & 0x00000001;
                             string opc(b?"st":"ld");
@@ -67,8 +68,8 @@ namespace disasm {
         }
         
         scalar48_insn *get_oper(uint32_t insn, uint32_t param) {
-            vc4_parameter u(IMMEDIATE, param);
-            vc4_parameter d(REGISTER, (insn | 0xffe0) & 0x001f);
+            vc4_parameter u(ParameterTypes::IMMEDIATE, param);
+            vc4_parameter d(ParameterTypes::REGISTER, (insn | 0xffe0) & 0x001f);
             uint8_t oper = ((insn >> 5) | 0xffe0) & 0x001f;
             string opcode(al_ops[oper]);
 
@@ -93,10 +94,10 @@ namespace disasm {
                     return get_oper(insn, insn_arg);
                 case 3:
                     do {
-                        vc4_parameter d(REGISTER, (insn | 0xffe0) & 0x001f);
-                        vc4_parameter s(REGISTER,
+                        vc4_parameter d(ParameterTypes::REGISTER, (insn | 0xffe0) & 0x001f);
+                        vc4_parameter s(ParameterTypes::REGISTER,
                                         ((insn >> 5) | 0xffe0) & 0x001f);
-                        vc4_parameter u(IMMEDIATE, insn_arg);
+                        vc4_parameter u(ParameterTypes::IMMEDIATE, insn_arg);
                         scalar48_insn *rv = new scalar48_insn("add", "r{d}, " \
                                                               "r{s}, {u}");
                         rv->addParameter("d", d)->addParameter("s", s)
