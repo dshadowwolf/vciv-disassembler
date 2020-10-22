@@ -16,24 +16,24 @@ namespace disasm {
             if (insn <= 10) rv = new scalar16_insn(noargs[insn], "");
             else if (((insn & 0x0020) && !(insn & 0x0040))) {
                 rv = new scalar16_insn("swi", "r{d}");
-                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x001f);
+                vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
                 rv->addParameter("d", p);
             } else if ((insn & 0x0040)) {
-                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x001f);
+                vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
                 if (insn & 0x0020) rv = new scalar16_insn("bl", "r{d}");
                 else rv = new scalar16_insn("b", "r{d}");
                 rv->addParameter("d", p);
             } else if ((insn & 0x0080) && !(insn & 0x0040)) {
-                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x000f);
+                vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
                 if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{d}");
                 else rv = new scalar16_insn("switch", "r{d}");
                 rv->addParameter("d", p);
             } else if ((insn & 0x00D0)) {
-                vc4_parameter p(ParameterTypes::REGISTER, 0x001f);
+                vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(0x001f));
                 rv = new scalar16_insn("version", "r{d}");
                 rv->addParameter("d", p);
             } else {
-                vc4_parameter p(ParameterTypes::REGISTER, insn & 0x003f);
+                vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x003f));
                 rv = new scalar16_insn("swi", "{u}");
                 rv->addParameter("u", p);
             }
@@ -51,8 +51,8 @@ namespace disasm {
             
             if (!(insn & 0x1000 && insn & 0x2000)) {
                 if ((insn & 0x0200) && !((insn & 0x0400) && (insn & 0x0800))) {
-                    vc4_parameter b(ParameterTypes::REGISTER, which_b_reg(insn));
-                    vc4_parameter m(ParameterTypes::REGISTER, insn & 0x001f);
+                    vc4_parameter b(ParameterTypes::REGISTER, (uint32_t)(which_b_reg(insn)));
+                    vc4_parameter m(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
                     uint8_t f = insn&0x0080;
                     string name(f?"stm":"ldm");
                     string fmt(insn&0x0100?
@@ -61,8 +61,8 @@ namespace disasm {
                     rv = new scalar16_insn(name, fmt);
                     rv->addParameter("b", b)->addParameter("m", m);
                 } else if((insn & 0x0400) & !(insn & 0x0800)) {
-                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
-                    vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x01f0) >> 4);
+                    vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+                    vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x01f0) >> 4));
                     rv = new scalar16_insn(insn& 0x0200?"st":"ld", "r{d}, (sp+({o}*4))");
                     rv->addParameter("d", d)->addParameter("o", o);
                 } else {
@@ -71,31 +71,31 @@ namespace disasm {
                     opcode.append(w==0?"":(string(".") + mem_op_widths[w]));
                     rv = new scalar16_insn(opcode, "r{d}, (r{s})");
 
-                    vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
-                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
+                    vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn & 0x00f0) >> 4));
+                    vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
                     rv->addParameter("s", s)->addParameter("d", d);
                 }
             } else {
                 if (!(insn & 0x2000)) {
                     if (insn & 0x0800) {
                         rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
-                        vc4_parameter d(ParameterTypes::REGISTER, insn & 0x001f);
-                        vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x07e0) >> 5);
+                        vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
+                        vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x07e0) >> 5));
                         rv->addParameter("d", d)->addParameter("o", o);
                     } else {
                         uint8_t cc = (insn & 0x0780) >> 7;
                         string opcode("b.");
                         opcode += condition_codes[cc];
                         rv = new scalar16_insn(opcode, "$+{o}*2");
-                        vc4_parameter o(ParameterTypes::IMMEDIATE, insn & 0x007f);
+                        vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x007f));
                         rv->addParameter("o", o);
                     }
                 } else {
                     rv = new scalar16_insn((insn& 0x0100)?"st":"ld",
                                            "r{d}, r{s}+({u}*4)");
-                    vc4_parameter u(ParameterTypes::IMMEDIATE, (insn & 0x0f00) >> 8 );
-                    vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
-                    vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
+                    vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x0f00) >> 8 ));
+                    vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn & 0x00f0) >> 4));
+                    vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
                     rv->addParameter("u", u)
                         ->addParameter("s", s)
                         ->addParameter("d", d);
@@ -117,8 +117,8 @@ namespace disasm {
             if (add.length() > 0) fmt += add;
             scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8), fmt);
 
-            vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
-            vc4_parameter s(ParameterTypes::REGISTER, (insn & 0x00f0) >> 4);
+            vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+            vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn & 0x00f0) >> 4));
             rv->addParameter("d", d)->addParameter("s", s);
             return rv;
         }
@@ -126,8 +126,8 @@ namespace disasm {
         scalar16_insn *getALRI(uint16_t insn) {
             uint8_t dc = (insn & 0x1e00) >> 9;
             scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==3?"r{d}, {u} << 3":"r{d}, {u}");
-            vc4_parameter d(ParameterTypes::REGISTER, insn & 0x000f);
-            vc4_parameter u(ParameterTypes::IMMEDIATE, (insn & 0x1f0) >> 4);
+            vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+            vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x1f0) >> 4));
             rv->addParameter("d", d)->addParameter("u", u);
             return rv;
         }
@@ -145,10 +145,10 @@ namespace disasm {
                 uint8_t cc_r = (insn & 0x0780) >> 7;
                 string cc(condition_codes[cc_r]);
                 rv = new scalar16_insn(string("b")+cc, "$+({o}*2)");                
-                rv->addParameter("o", vc4_parameter(ParameterTypes::IMMEDIATE, insn & 0x007f));
+                rv->addParameter("o", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x007f)));
             } else {
-                vc4_parameter d(ParameterTypes::REGISTER, insn & 0x001f);
-                vc4_parameter o(ParameterTypes::IMMEDIATE, (insn & 0x03f0) >> 5);
+                vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
+                vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x03f0) >> 5));
                 rv = new scalar16_insn("add", "r{d}, sp, ({o}*4)");
                 rv->addParameter("d", d)->addParameter("o", o);
             }

@@ -48,8 +48,8 @@ namespace disasm {
                     
                     if (p.getContainedType() == "i" || p.getContainedType() == "j") {
                         if (p.getType() == ParameterTypes::IMMEDIATE)
-                            outs = (boost::format { "0x%08X" } % p.value<int>()).str();
-                        else outs = std::to_string(p.value<int>());
+                            outs = (boost::format { "0x%08X" } % p.value<uint32_t>()).str();
+                        else outs = std::to_string(p.value<uint32_t>());
                     } else outs = std::to_string(p.value<float>());
                     
                     string re_s(string("(\\{\\s*") + it->first + string("\\s*\\})"));
