@@ -1,5 +1,5 @@
 # VideoCore-IV Disassembler
-## Raison d'&#00EA;tre
+## Raison d'être
 
 This project was born of a request from a friend for help in possibly resurrecting the open-source Pi Firmware project and finding that existing tools for understanding how the existing firmware handled the boot of multiple revisions of the various boards managed it.
 
