@@ -1,3 +1,4 @@
+#include <disasm_config.h>
 #include "disasm_scalar16.hpp"
 #include "disasm_scalar32.hpp"
 #include "disasm_scalar48.hpp"
@@ -12,6 +13,8 @@
 
 #include <cstdint>
 #include <cstdio>
+
+#include <iostream>
 
 using namespace std;
 
@@ -39,6 +42,9 @@ int main() {
     uint8_t *buffer, *work;
     int fd;
     vector<disasm::vc4_insn> instructions;
+
+    std::cout << "Wolfs VC-IV Disassembler version " << VCIV_VERSION << std::endl;
+    std::cout << "(c) 2020 Daniel \"DShadowWolf\" Hazelton <dshadowwolf@gmailcom>" << std::endl;
     
     if (stat("blinker01.bin", &st) != 0) {
         perror("stat: ");
