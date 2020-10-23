@@ -20,5 +20,18 @@
 #else
 #define READ_WORD(x) (uint16_t)(*((uint16_t *)(x)))
 #define READ_DWORD_X(x) (uint32_t)(*((uint32_t *)(x)))
-#define READ_DWORD(x) (uint32_t)(((uint32_t)READ_WORD((x)+2)) << 16)|READ_WORD(x)
+#define READ_DWORD(x) (uint32_t)(((uint32_t)READ_WORD((x))) << 16)|READ_WORD(x+2)
 #endif
+
+//
+// SCALAR16 -> x == 000? ????
+// SCALAR32 -> x == 0001 000?
+// SCALAR48 -> x == 0001 110?
+// VECTOR48 -> x == 0001 1110
+// VECTOR80 -> x == 0001 1111
+
+#define IS_SCALAR16(x) (!((x) & 0x10))
+#define IS_SCALAR48(x) (!IS_SCALAR16(x) && (((x) & 0x1c) && !((x) & 0x02)))
+#define IS_VECTOR80(x) ((x) == 0x1f)
+#define IS_VECTOR48(x) ((x) == 0x1e)
+#define IS_SCALAR32(x) (!IS_SCALAR48(x) && !IS_VECTOR48(x) && !IS_VECTOR80(x) && !IS_SCALAR16(x))

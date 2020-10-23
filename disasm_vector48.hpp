@@ -8,8 +8,8 @@ using namespace std;
 namespace disasm {
     class vector48_insn : public vc4_insn {
         public:
-            inline vector48_insn(string insn_name)
-                : vc4_insn(insn_name, string("{name}"), 48) {};
+            inline vector48_insn(string insn_name, string fmt)
+                : vc4_insn(insn_name, fmt, 48) {};
    };
 };
 

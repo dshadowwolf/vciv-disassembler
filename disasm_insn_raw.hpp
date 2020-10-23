@@ -44,17 +44,37 @@ namespace disasm {
                 for (auto it = parameters.begin(); it != parameters.end(); ++it) {
                     string item_name(it->first);
                     vc4_parameter p = it->second;
-                    string outs;
-                    
-                    if (p.getContainedType() == "i" || p.getContainedType() == "j") {
-                        if (p.getType() == ParameterTypes::IMMEDIATE)
-                            outs = (boost::format { "0x%08X" } % p.value<uint32_t>()).str();
-                        else outs = std::to_string(p.value<uint32_t>());
-                    } else outs = std::to_string(p.value<float>());
-                    
+                    string rval;
+                    try {
+                        switch( p.getType() ) {
+                            case ParameterTypes::REGISTER:
+                                rval = std::to_string(p.value<uint32_t>());
+                                break;
+                            case ParameterTypes::IMMEDIATE:
+                                if (p.getContainedType() == "f")
+                                    rval = std::to_string(p.value<float>());
+                                else
+                                    rval = (boost::format { "0x%08X" } % p.value<uint32_t>()).str();
+                                break;
+                            case ParameterTypes::VECTOR_REGISTER:
+                            case ParameterTypes::DATA:
+                                rval = p.value<string>();
+                                break;
+                            case ParameterTypes::ERROR:
+                                rval = "ERROR - Parameter Type is ParameterTypes::ERROR";
+                                break;
+                            default:
+                                rval = string("ERROR - unknown Parameter Type ")+p.getType()._to_string();
+                        }
+                    } catch( const std::bad_any_cast &e ) {
+                        std::cerr << "caught bad_any_cast (" << e.what() << ")" << std::endl;
+                        std::cerr << "processing type " << p.getType()._to_string() << " - parameter has internal type flag of \"" << p.getContainedType() << "\"" << std::endl;
+                        std::cerr << "op name: " << name << " -- size: " << std::to_string((uint8_t)(size/8)) << std::endl;
+                        abort();
+                    }
                     string re_s(string("(\\{\\s*") + it->first + string("\\s*\\})"));
                     regex fx(re_s);
-                    rv = regex_replace(rv, fx, outs);
+                    rv = regex_replace(rv, fx, rval);
                 }
                 
                 rv = regex_replace(rv, regex(nm), name);

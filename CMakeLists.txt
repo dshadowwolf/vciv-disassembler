@@ -7,7 +7,7 @@ project(disasm_test VERSION 1.0.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
-add_executable(disasm_test driver.cpp disasm_scalar16.cpp disasm_scalar32.cpp disasm_scalar48.cpp)
+add_executable(disasm_test driver.cpp disasm_scalar16.cpp disasm_scalar32.cpp disasm_scalar48.cpp disasm_vector48.cpp vector_helpers.cpp)
 
 target_include_directories(disasm_test PUBLIC "${PROJECT_BINARY_DIR}")
 

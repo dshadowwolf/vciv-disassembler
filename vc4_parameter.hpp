@@ -11,8 +11,7 @@
 ** -*-mode:cc; fill-column: 79; std: c++17
  */
 namespace disasm {
-    ENUM(ParameterTypes, REGISTER, MEMORY, OFFSET, CC, SIZE_CODE,
-         IMMEDIATE, VECTOR_REG, ERROR);
+    ENUM(ParameterTypes, REGISTER, IMMEDIATE, VECTOR_REGISTER, DATA, ERROR);
 
     class vc4_parameter {
         private:

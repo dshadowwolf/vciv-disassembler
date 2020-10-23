@@ -97,7 +97,7 @@ namespace disasm {
                     do {
                         vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
                         vc4_parameter s(ParameterTypes::REGISTER,
-                                        ((insn >> 5) | 0xffe0) & 0x001f);
+                                        (uint32_t)(((insn >> 5) | 0xffe0) & 0x001f));
                         vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)(insn_arg));
                         scalar48_insn *rv = new scalar48_insn("add", "r{d}, " \
                                                               "r{s}, {u}");

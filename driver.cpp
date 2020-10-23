@@ -2,6 +2,7 @@
 #include "disasm_scalar16.hpp"
 #include "disasm_scalar32.hpp"
 #include "disasm_scalar48.hpp"
+#include "disasm_vector48.hpp"
 #include "disasm_insn_raw.hpp"
 
 #include <vector>
@@ -16,6 +17,8 @@
 
 #include <iostream>
 
+#include <boost/format.hpp>
+
 using namespace std;
 
 namespace disasm {
@@ -28,6 +31,9 @@ namespace disasm {
     namespace scalar48 {
         extern scalar48_insn *getInstruction(uint8_t *);
     }
+    namespace vector48 {
+        extern vector48_insn *getInstruction(uint8_t *);
+    }
 }
 
 unsigned char reverse(unsigned char b) {
@@ -37,7 +43,7 @@ unsigned char reverse(unsigned char b) {
    return b;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     struct stat st;
     uint8_t *buffer, *work;
     int fd;
@@ -45,13 +51,21 @@ int main() {
 
     std::cout << "Wolfs VC-IV Disassembler version " << VCIV_VERSION << std::endl;
     std::cout << "(c) 2020 Daniel \"DShadowWolf\" Hazelton <dshadowwolf@gmailcom>" << std::endl;
-    
-    if (stat("blinker01.bin", &st) != 0) {
+
+    const std::vector<std::string> usage = { "\n", "\tUSAGE:", (boost::format { "\t\t%s <binary file name>" } % argv[0]).str(), "\n" };
+
+    if (argc < 2 || argc > 2) {
+        for(auto line : usage) std::cout << line << std::endl;
+
+        return -2;
+    }
+
+    if (stat(argv[1], &st) != 0) {
         perror("stat: ");
         return -1;
     }
     
-    fd = open("blinker01.bin", O_RDONLY);
+    fd = open(argv[1], O_RDONLY);
     if (fd < 0) {
         perror("open: ");
         return fd;
@@ -67,22 +81,26 @@ int main() {
         return -1;
     }
 
+    close(fd);
+    
     while (work - buffer < st.st_size) {
         disasm::vc4_insn *ci;
-        uint16_t insn_raw = *((uint16_t *)work);
-        uint8_t sz = reverse( (uint8_t)(insn_raw >> 8) ) & 0x1f;
+        uint16_t insn_raw = READ_WORD(work);
+        uint8_t qsz = (((uint8_t)(insn_raw >> 8)) & 0xf8) >> 3;
         uint8_t ssz;
-        
-        if (!(sz & 1)) ci = disasm::scalar16::getInstruction(work);
-        else if( (sz & 1) && !(sz & 2)) ci = disasm::scalar32::getInstruction(work);
-        else if( (sz & 7) && !(sz & 8)) ci = disasm::scalar48::getInstruction(work);
-        else std::cerr << "currently unhandled instruction size -- " << std::bitset<16>(*work) << " (" << std::bitset<8>(sz) << ") " << std::endl;
+
+        if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work);
+        else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
+        else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work);
+        else if ( qsz == 30 ) ci = disasm::vector48::getInstruction(work);
+        else if ( qsz == 31 ) std::cout << "VECTOR80 currenly completely undefined" << std::endl;
+        else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
         if (ci != NULL) {
             ssz = ci->getSizeBytes();
             instructions.push_back(*ci);
         } else {
-            ssz = (sz & 0x1f)?10:6;
+            ssz = 10;
         }
 
         work += ssz;

@@ -317,7 +317,7 @@ namespace disasm {
             // certain bit-patterns
             uint32_t insn_raw = READ_DWORD(buffer);
             uint8_t insn_type = insn_raw >> 28 & 0x03;
-            
+
             switch( insn_type ) {
                 case 0:
                     return addCmpBr(insn_raw);

@@ -50,8 +50,34 @@ namespace disasm {
     
     const string vector_flags_w[] = { "", "NV", "IFNZ", "IFN", "IFNN", "IFC", "IFNC" };
     
-    const string vector_rs[] = { " + r0", " + r1", " + r2", " + r3", " + r4", " + r5", " + r6", " + r7" };
-    
+    const string vector_ops_full[] = { "vmov", "vbitplanes", "veven", "vodd",
+                                       "vinterl", "vinterh", "vbitrev", "vror",
+                                       "vshl", "vshls", "vlsr", "vasr",
+                                       "vsignhl", "vop13[unused]", "vsignasl",
+                                       "vsignasls", "vand", "vor", "vxor",
+                                       "vbic", "vcount", "vmsb",
+                                       "vop22[unused]", "vop23[unused]", "vmin",
+                                       "vmax", "vdist", "vdists", "vclip",
+                                       "vsign", "vclips", "vtestmag", "vadd",
+                                       "vadds", "vaddc", "vaddsc", "vsub",
+                                       "vsubs", "vsubc", "vsubsc", "vrsub",
+                                       "vrsubs", "vrsubc", "vrsubsc",
+                                       "vop44[unused]", "vop45[unused]",
+                                       "vop46[unused]", "vop47[unused]",
+                                       "vmull.ss", "vmulls.ss", "vmulm.ss",
+                                       "vmulms.ss", "vmulhd.ss", "vmulhd.su",
+                                       "vmulhd.us", "vmulhd.uu", "vmulhn.ss",
+                                       "vmulhn.su", "vmulhn.us", "vmulhn.uu",
+                                       "vmuldt.ss", "vmuldt.su",
+                                       "vop62[unused]", "vop63[unused]" };
+    const string vector48_alts[] = { "vop48[unused]", "vop49[unused]",
+                                     "vop50[unused]", "vop51[unused]",
+                                     "vmul32.ss", "vmul32.su", "vmul32.us",
+                                     "vmul32.uu",  "vop56[unused]",
+                                     "vop57[unused]", "vop58[unused]",
+                                     "vop59[unused]", "vop60[unused]",
+                                     "vop61[unused]", "vop62[unused]",
+                                     "vop63[unused]" };
 }
 
 #endif // __VC4_DATA_H_
