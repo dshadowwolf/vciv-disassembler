@@ -14,12 +14,12 @@ namespace disasm {
                 case 0: // H[XY](y, ??)
                     rv += "H";
                     x = 0;
-                    y = cleaned & 0x003f;
+                    y = (cleaned & 0x003f);
                     break;
                 case 1: //  V[XY](y, ??+x)
                     rv += "V";
-                    x = cleaned & 0x000f;
-                    y = (cleaned & 0x0030) << 4;
+                    x = (cleaned & 0x000f);
+                    y = ((cleaned & 0x0030) << 4);
                     break;
             }
             if (cleaned & 0x0300) rv += "Y";

@@ -16,11 +16,14 @@
 // read the little-endian 32bit dword as how SCALAR48 needs it
 #define READ_DWORD_X(x) (uint32_t)((((uint32_t)READ_WORD((x)+2)) << 16)|READ_WORD(x))
 // read as SCALAR32 expects it
-#define READ_DWORD(x) (uint32_t)(((uint32_t)READ_WORD(x)) << 16)|READ_WORD((x)+2)
+#define READ_DWORD(x) (uint32_t)(((uint32_t)READ_WORD(x+2)) << 16)|READ_WORD((x))
 #else
 #define READ_WORD(x) (uint16_t)(*((uint16_t *)(x)))
 #define READ_DWORD_X(x) (uint32_t)(*((uint32_t *)(x)))
-#define READ_DWORD(x) (uint32_t)(((uint32_t)READ_WORD((x))) << 16)|READ_WORD(x+2)
+#define READ_DWORD(x) [](uint8_t *ins)->int {                 \
+        auto b = (((uint32_t)READ_WORD(ins)) << 16);          \
+        return (uint32_t)(b | READ_WORD(ins+2));              \
+    } (x)
 #endif
 
 //

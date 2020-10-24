@@ -45,7 +45,9 @@ unsigned char reverse(unsigned char b) {
 
 int main(int argc, char *argv[]) {
     struct stat st;
-    uint8_t *buffer, *work;
+    uint8_t *buffer;
+    uint8_t *work;
+    
     int fd;
     vector<disasm::vc4_insn> instructions;
 
@@ -89,15 +91,20 @@ int main(int argc, char *argv[]) {
         uint8_t qsz = (((uint8_t)(insn_raw >> 8)) & 0xf8) >> 3;
         uint8_t ssz;
 
+        if (insn_raw == 0xcec0) {
+            std::cout << "read 0xcec0\n";
+            std::cout << "DWORD: " << (boost::format { "0x%08X" } % READ_DWORD(work)).str() << std::endl;
+//            abort();
+        }
         if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work);
         else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
         else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work);
         else if ( qsz == 30 ) ci = disasm::vector48::getInstruction(work);
-        else if ( qsz == 31 ) std::cout << "VECTOR80 currenly completely undefined" << std::endl;
+        else if ( qsz == 31 ) ci = NULL;
         else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
         if (ci != NULL) {
-            ssz = ci->getSizeBytes();
+            ssz = (ci->getReadable()=="*unknown*")?2:ci->getSizeBytes();
             instructions.push_back(*ci);
         } else {
             ssz = 10;

@@ -316,14 +316,14 @@ namespace disasm {
             // this should be possible by checking for
             // certain bit-patterns
             uint32_t insn_raw = READ_DWORD(buffer);
-            uint8_t insn_type = insn_raw >> 28 & 0x03;
-
+            uint8_t insn_type = (insn_raw >> 28) ^ 0x80;
+            
             switch( insn_type ) {
-                case 0:
+                case 0: // 0b000
                     return addCmpBr(insn_raw);
-                case 1:
+                case 1: // 0b001
                     return branch(insn_raw);
-                case 2:
+                case 2: // 0b010
                     do {
                         switch(((insn_raw >> 24) & 0x0f) >> 1) {
                             case 0:
@@ -337,14 +337,13 @@ namespace disasm {
                         }
                     } while(0); // nice trick Linus - thanks for teaching it to me
                     break;
-                case 3:
+                case 3: // 0b011
                     return alu_raw(insn_raw);
-                case 4:
+                case 4: // 0b100
                     if ( insn_raw >> 24 & 0x08 ) return floatOp(insn_raw);
                     return alu_cond(insn_raw);
-                default:
-                    assert("Code Should Not Hit This!");
-                    return NULL;
+                default: // 0b101 only - 0b110 would be part of the size flags for SCALAR48
+                    return new scalar32_insn("*unknown*", "");
             }
             assert("Code Should Not Hit This!");
             return NULL;
