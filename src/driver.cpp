@@ -1,9 +1,9 @@
 #include <disasm_config.h>
-#include "disasm_scalar16.hpp"
-#include "disasm_scalar32.hpp"
-#include "disasm_scalar48.hpp"
-#include "disasm_vector48.hpp"
-#include "disasm_insn_raw.hpp"
+#include <disasm_scalar16.hpp>
+#include <disasm_scalar32.hpp>
+#include <disasm_scalar48.hpp>
+#include <disasm_vector48.hpp>
+#include <disasm_insn_raw.hpp>
 
 #include <vector>
 

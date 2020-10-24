@@ -12,7 +12,7 @@
 // #define NDEBUG
 #include <cassert>
 
-#include "vc4_parameter.hpp"
+#include <vc4_parameter.hpp>
 
 using namespace std;
 

@@ -1,7 +1,7 @@
 #include <disasm_config.h>
-#include "disasm_scalar32.hpp"
-#include "vc4_data.hpp"
-#include "vc4_parameter.hpp"
+#include <disasm_scalar32.hpp>
+#include <vc4_data.hpp>
+#include <vc4_parameter.hpp>
 
 using namespace std;
 

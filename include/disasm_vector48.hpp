@@ -1,7 +1,7 @@
 #ifndef __DISASM_VECTOR48_H_
-#define __DISASM_VECTOR_H_
+#define __DISASM_VECTOR48_H_
 
-#include "disasm_insn_raw.hpp"
+#include <disasm_insn_raw.hpp>
 
 using namespace std;
 
@@ -13,4 +13,4 @@ namespace disasm {
    };
 };
 
-#endif // __DISASM_SCALAR32_H_
+#endif // __DISASM_VECTOR48_H_

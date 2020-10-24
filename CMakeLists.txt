@@ -7,8 +7,9 @@ project(disasm_test VERSION 1.0.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
-add_executable(disasm_test driver.cpp disasm_scalar16.cpp disasm_scalar32.cpp disasm_scalar48.cpp disasm_vector48.cpp vector_helpers.cpp)
-
+file(GLOB dat_SRCS "${PROJECT_SOURCE_DIR}/src/*.cpp")
+add_executable(disasm_test ${dat_SRCS})
+include_directories(disasm_test PUBLIC "${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/src")
 target_include_directories(disasm_test PUBLIC "${PROJECT_BINARY_DIR}")
 
 set(Boost_USE_STATIC_LIBS OFF)
@@ -26,7 +27,7 @@ TEST_BIG_ENDIAN(IS_BE)
 if(IS_BE)
   message(STATUS "Configuring instruction read for Big Endian systems")
 else()
-  message(STATUS "Configuring intruction read for Little Endian systems")
+  message(STATUS "Configuring instruction read for Little Endian systems")
 endif()
 
 configure_file(disasm_config.h.in disasm_config.h)

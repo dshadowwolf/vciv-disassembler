@@ -5,7 +5,7 @@
 #include <string>
 #include <cstdint>
 
-#include "enum_magic.hpp"
+#include <enum_magic.hpp>
 
 /*
 ** -*-mode:cc; fill-column: 79; std: c++17

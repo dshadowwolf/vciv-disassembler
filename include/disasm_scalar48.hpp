@@ -1,7 +1,7 @@
 #ifndef __DISASM_SCALAR48_H_
 #define __DISASM_SCALAR48_H_
 
-#include "disasm_insn_raw.hpp"
+#include <disasm_insn_raw.hpp>
 
 using namespace std;
 
