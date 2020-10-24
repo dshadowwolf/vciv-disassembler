@@ -30,7 +30,7 @@ namespace disasm {
                                  "fmax", "frcp", "frsqrt", "fnmul", "fmin",
                                  "fceil", "ffloor", "flog2", "fexp2" };
     
-    const string vector_widths[] = { "b", "s", "l", ".reserved" };
+    const string vector_widths[] = { "8", "16", "32", "[8]" };
     
     const string vector_ops_48[] = { "ld", "lookupmh", "lookupml",
                                      "undefined(00011)", "st", "indexwritemh",

@@ -7,21 +7,19 @@ using namespace std;
 namespace disasm {
     namespace vector48 {
         vector48_insn *vector48memory(uint64_t insn) {
-            string acc_ops[] = { "ns", "s32", "nop", "s16" };
-            uint8_t w = ((insn >> 34) & 0x03);
+            uint8_t w = ((insn >> 35) & 0x03);
             uint8_t check = ((insn >> 37) & 0x1f);
             string mop(vector_ops_48[check]);
-            string width(check==24?acc_ops[w]:vector_widths[w]);
+            string width(check==24?"":vector_widths[w]);
             string opc("v");
-            opc += mop;
-            opc += ".";
             opc += width;
+            opc += mop;
 
-            string dreg = disasm::vector::decode_vector_register((insn >> 21) & 0x03ff);
-            string areg = disasm::vector::decode_vector_register((insn >> 11) & 0x03ff);
+            string dreg = disasm::vector::decode_vector_register((insn >> 22) & 0x03ff);
+            string areg = disasm::vector::decode_vector_register((insn >> 12) & 0x03ff);
             
-            uint8_t has_p = (insn >> 10) & 1;
-            uint8_t pf = (insn >> 7) & 7;
+            bool has_p = ((insn >> 10) & 1) == 1;
+            bool pf = ((insn >> 7) & 7) == 7;
 
             string flags;
             uint8_t p;
@@ -40,7 +38,7 @@ namespace disasm {
             
             if (has_p)
                 o = vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x0000003f));
-            else if(pf == 7)
+            else if(pf)
                 o = vc4_parameter(ParameterTypes::REGISTER, (uint32_t)(insn & 0x0000003f));
             else
                 o = vc4_parameter(ParameterTypes::VECTOR_REGISTER, disasm::vector::decode_vector_register(insn & 0x000003ff));
@@ -48,9 +46,21 @@ namespace disasm {
             uint8_t rs = ((insn & 0x000007000000) >> 32);
             string fmt;
             if (rs > 0)
-                fmt = "{d}+r{s}, {a}+r{s}, {o} {flags}";
+                fmt = string("{d}+r{s}") + (areg=="DISCARD-IGNORE"?"":", {a}+r{s}");
             else
-                fmt = "{d}, {a}, {o} {flags}";
+                fmt = string("{d}") + (areg=="DISCARD-IGNORE"?"":", {a}");//+", {o} {flags}";
+
+            if (has_p) {
+                fmt += ", {o}";
+            } else if(pf) {
+                fmt += ", (r{o})";
+            } else if (!has_p && !pf) {
+                if (rs > 0) fmt += ", {o}+r{s}";
+                else fmt += ", {o}";
+            }
+
+            fmt += " {flags}";
+            
             vc4_parameter flag_p(ParameterTypes::DATA, flags);
             vector48_insn *rv = new vector48_insn(opc, fmt);
             rv->addParameter("d", d)->addParameter("a", a)
@@ -65,13 +75,13 @@ namespace disasm {
             uint8_t opc = ((insn >> 35) & 0x3f);
             string vop(vector_ops_full[opc]);
             bool X = !!((insn >> 41) & 0x01);
-            if (opc < 48) vop += (X?"H":"L");
+            if (opc < 48) vop += (X?".h":".l");
             else if (X) {
                 vop = std::string(vector48_alts[opc - 48]);
             }
 
             string dr(disasm::vector::decode_vector_register((insn >> 22) & 0x000000000000000003ff ));
-            string ar(disasm::vector::decode_vector_register((insn >> 22) & 0x000000000000000003ff ));
+            string ar(disasm::vector::decode_vector_register((insn >> 12) & 0x000000000000000003ff ));
             string flags;
             
             vc4_parameter d(ParameterTypes::VECTOR_REGISTER, dr);
@@ -118,7 +128,7 @@ namespace disasm {
             param <<= 16;
             param |= param_low;
             insn |= param;
-            
+
             uint8_t op_class = insn >> 42;
             op_class &= 0x01; // though 2 bits are set aside for this
                               // only 1 of those bits is used
