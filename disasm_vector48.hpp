@@ -9,7 +9,7 @@ namespace disasm {
     class vector48_insn : public vc4_insn {
         public:
             inline vector48_insn(string insn_name, string fmt)
-                : vc4_insn(insn_name, fmt, 48) {};
+                : vc4_insn(insn_name, string("{name} ")+fmt, 48) {};
    };
 };
 

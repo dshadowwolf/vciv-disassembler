@@ -51,11 +51,11 @@ namespace disasm {
         scalar16_insn *getMemoryOperation(uint16_t insn) {
             scalar16_insn *rv;
             uint8_t top = (insn & 0xff00) >> 8;
-
+            
             switch (top) {
                 case 0:
                 case 1:
-                    rv = new scalar16_insn("*unknown*", "");
+                    rv = new scalar16_insn("*unknown*", "flop");
                     break;
                 case 2:
                     do {
@@ -105,48 +105,61 @@ namespace disasm {
                     break;
                 default:
                     do {
-                        uint8_t type = ((insn & 0xf800) >> 11);
-                        switch(type) {
-                            case 0:
-                            case 1:
-                                // how did his happen ?
-                                rv = new scalar16_insn("*unknown*", "");
-                                break;
-                            case 2:
-                                do {
-                                    vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-                                    vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 5) & 0x003f));
-                                    rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
-                                    rv->addParameter("d", d)->addParameter("o", o);
-                                } while(0);
-                                break;
-                            case 3:
-                                do {
-                                    vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x003f));
-                                    string c = condition_codes[(insn >> 6) & 0x0007];
-                                    rv = new scalar16_insn(string("b")+c, "$+{o}*2");
-                                    rv->addParameter("o", o);
-                                } while(0);
-                                break;
-                            case 4:
-                            case 5:
-                            case 6:
-                            case 7:
-                                do {
-                                    string opname((type < 6)?"ld":"st");
-                                    vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-                                    vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
-                                    vc4_parameter u(ParameterTypes::REGISTER, (uint32_t)((insn >> 8) & 0x000f));
-                                    rv = new scalar16_insn(opname, "r{d}, (r{s}+{u}*4)");
-                                    rv->addParameter("d", d)->addParameter("s", s)->addParameter("u", u);
-                                } while(0);
-                                break;
-                            default:
-                                rv = new scalar16_insn("*unknown*", "");
+                        if ( top < 16 ) {
+                            string opname(((top & 1) == 0)?"ld":"st");
+                            vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+                            vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
+                            opname += mem_op_widths[(top >> 1) & 0x0003];
+                            rv = new scalar16_insn(opname, "r{d}, (r{s})");
+                            rv->addParameter("d", d)->addParameter("s", s);
+                        } else {
+                            uint8_t type = ((insn & 0xf800) >> 11);
+                            switch(type) {
+                                case 0:
+                                case 1:
+                                    // how did his happen ?
+                                    rv = new scalar16_insn("*unknown*", "");
+                                    break;
+                                case 2:
+                                    do {
+                                        vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
+                                        vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 5) & 0x003f));
+                                        rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
+                                        rv->addParameter("d", d)->addParameter("o", o);
+                                    } while(0);
+                                    break;
+                                case 3:
+                                    do {
+                                        vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x003f));
+                                        string c = condition_codes[(insn >> 6) & 0x0007];
+                                        rv = new scalar16_insn(string("b")+c, "$+{o}*2");
+                                        rv->addParameter("o", o);
+                                    } while(0);
+                                    break;
+                                case 4:
+                                case 5:
+                                    do {
+                                        vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+                                        vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
+                                        vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 8) & 0x000f));
+                                        rv = new scalar16_insn("ld", "r{d}, (r{s}+{u}*4)");
+                                        rv->addParameter("d", d)->addParameter("s", s)->addParameter("u", u);
+                                    } while(0);
+                                case 6:
+                                case 7:
+                                    do {
+                                        vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
+                                        vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
+                                        vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 8) & 0x000f));
+                                        rv = new scalar16_insn("st", "r{d}, (r{s}+{u}*4)");
+                                        rv->addParameter("d", d)->addParameter("s", s)->addParameter("u", u);
+                                    } while(0);
+                                default:
+                                    rv = new scalar16_insn("*unknown*", "{name}");
+                            }
                         }
                     } while(0);
             }
-
             return rv;
         }
 

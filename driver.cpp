@@ -91,11 +91,6 @@ int main(int argc, char *argv[]) {
         uint8_t qsz = (((uint8_t)(insn_raw >> 8)) & 0xf8) >> 3;
         uint8_t ssz;
 
-        if (insn_raw == 0xcec0) {
-            std::cout << "read 0xcec0\n";
-            std::cout << "DWORD: " << (boost::format { "0x%08X" } % READ_DWORD(work)).str() << std::endl;
-//            abort();
-        }
         if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work);
         else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
         else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work);
@@ -113,8 +108,11 @@ int main(int argc, char *argv[]) {
         work += ssz;
     }
 
+    uint32_t addr;
     for ( auto it = instructions.begin(); it != instructions.end(); it++ ) {
         disasm::vc4_insn curr = *it;
-        std::cout << curr.toString() << std::endl;
+        
+        std::cout << (boost::format { "0x%08X" } % addr ).str() << "\t" << curr.toString() << std::endl;
+        addr += (curr.getReadable()=="*unknown*")?2:curr.getSizeBytes();
     }
 }

@@ -1,23 +1,6 @@
-SCALAR48 do not decode correctly...
-  -> fixed
-  
-SCALAR16 and SCALAR32 also not always properly decoding
-  -> mov r0, 0   -> mov reg-reg decoded instead of mov reg-imm
-    -> fixed, was a copypasta
-  -> add r0, 1   -> mul reg-reg
-    -> fixed, Herman's notes were correct, I had f*cked up the initial shift
-    -> fixed, Herman's notes on encoding were incorrect
-    -> if we adjust the 4-bit instruction to add the padding he notes
-       we get a 000100 for the 6-bit form of the instruction - mul - instead
-       of the expect 000010 of add
-  -> bne <label> -> ld r12, (r15)
-  -> bra <label> -> st.s r2, (r7)
-    -> @dshadowwolf goofed and forgot to add a check for `& 0x0100 && !&0x0400`
-    -> this caused an `add rd, sp, o*4` and the `b<cc>` decoding for
-       scalar16 instructions to be lost and default to deeper memory ops
-
 VECTOR48 and VECTOR80 implementations
   - VECTOR48 has a basic implementation, but no test available
-  
+  - limited testing is showing success, vector register decode helper is completely borked
+
 -- Math system and tracking of program segment and locations for use in offset calculations
   -- perhaps a flag in the vc4_parameter result for such - maybe a second type flag for "needs calc" and then a simple expression evaluator ?
