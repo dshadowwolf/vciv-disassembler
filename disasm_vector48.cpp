@@ -60,7 +60,7 @@ namespace disasm {
             }
 
             fmt += " {flags}";
-            
+
             vc4_parameter flag_p(ParameterTypes::DATA, flags);
             vector48_insn *rv = new vector48_insn(opc, fmt);
             rv->addParameter("d", d)->addParameter("a", a)
