@@ -15,8 +15,8 @@ namespace disasm {
             opc += width;
             opc += mop;
 
-            string dreg = disasm::vector::decode_vector_register((insn >> 22) & 0x03ff);
-            string areg = disasm::vector::decode_vector_register((insn >> 12) & 0x03ff);
+            string dest_register = disasm::vector::decode_vector_register((insn >> 22) & 0x03ff);
+            string source_register_a = disasm::vector::decode_vector_register((insn >> 12) & 0x03ff);
             
             bool has_p = ((insn >> 10) & 1) == 1;
             bool pf = ((insn >> 7) & 7) == 7;
@@ -32,8 +32,8 @@ namespace disasm {
                 p = (insn & 0x003f);
             }
 
-            vc4_parameter d(ParameterTypes::VECTOR_REGISTER, dreg);
-            vc4_parameter a(ParameterTypes::VECTOR_REGISTER, areg);
+            vc4_parameter d(ParameterTypes::VECTOR_REGISTER, dest_register);
+            vc4_parameter a(ParameterTypes::VECTOR_REGISTER, source_register_a);
             vc4_parameter o(ParameterTypes::ERROR, 0);
             
             if (has_p)
@@ -46,9 +46,9 @@ namespace disasm {
             uint8_t rs = ((insn & 0x000007000000) >> 32);
             string fmt;
             if (rs > 0)
-                fmt = string("{d}+r{s}") + (areg=="DISCARD-IGNORE"?"":", {a}+r{s}");
+                fmt = string("{d}+r{s}") + (source_register_a == "DISCARD-IGNORE" ? "" : ", {a}+r{s}");
             else
-                fmt = string("{d}") + (areg=="DISCARD-IGNORE"?"":", {a}");//+", {o} {flags}";
+                fmt = string("{d}") + (source_register_a == "DISCARD-IGNORE" ? "" : ", {a}");//+", {o} {flags}";
 
             if (has_p) {
                 fmt += ", {o}";
