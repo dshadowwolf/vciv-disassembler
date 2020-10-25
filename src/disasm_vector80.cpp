@@ -1,3 +1,4 @@
+#include <disasm_config.h>
 #include <disasm_vector80.hpp>
 #include <vc4_data.hpp>
 #include <vector_helpers.hpp>
@@ -14,10 +15,10 @@ namespace disasm {
 			uint16_t end;
 
 			v80_dmap(uint8_t *buff) {
-				first = readWord(buff);
-				mid = readDWord(buff + 2);
-				trail = readWord(buff + 6);
-				end = readWord(buff + 8);
+				first = READ_WORD(buff);
+				mid = READ_DWORD(buff + 2);
+				trail = READ_WORD(buff + 6);
+				end = READ_WORD(buff + 8);
 			}
 		};
 
@@ -81,7 +82,7 @@ namespace disasm {
 				vc4_parameter A_(ParameterTypes::VECTOR_REGISTER, A[_A]);
 				vc4_parameter a_(ParameterTypes::IMMEDIATE, (uint32_t)((insn.mid >> 12) & 0x3f));
 				vc4_parameter ra_x(ParameterTypes::IMMEDIATE, (uint32_t)rax);
-				vc4_parameter _H(ParameterTypes::DATA, H[(insn.trail >> 4) & 3]);
+				vc4_parameter _H(ParameterTypes::DATA, G[(insn.trail >> 4) & 3]);
 				vc4_parameter h(ParameterTypes::DATA, _h>=15?"":(string("+r")+std::to_string(_h)));
 				vc4_parameter imm16(ParameterTypes::IMMEDIATE, (uint32_t)((_i << 7) | (insn.mid & 0x7f)));
 				vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)(((insn.end) >> 2) & 0xf));
@@ -97,7 +98,7 @@ namespace disasm {
 			} else if( ((insn.mid >> 18) & 0xe) == 0xe ) {
 				uint16_t _i = ((insn.end & 3) | (((insn.end >> 4) & 0x7f) << 2));
 				uint8_t  rs = ((insn.end >> 2) & 0xf);
-				string  ifz(vector_flags[p+2]);
+				string  ifz(vector_flags_w[p+2]);
 				uint8_t  _m = (insn.trail & 0x0f);
 				uint8_t  _H = ((insn.trail >> 4) & 3);
 				uint8_t  _h = ((insn.trail >> 6) & 0xf);
@@ -114,11 +115,11 @@ namespace disasm {
 
 				vc4_parameter D(ParameterTypes::VECTOR_REGISTER, A[_D]);
 				vc4_parameter d(ParameterTypes::IMMEDIATE, (uint32_t)_d);
-				vc4_parameter G(ParameterTypes::DATA, G[_G]);
+				vc4_parameter G_(ParameterTypes::DATA, G[_G]);
 				vc4_parameter g(ParameterTypes::DATA, _g>=15?"":(string("+r")+std::to_string(_g)));
 				vc4_parameter a_(ParameterTypes::IMMEDIATE, (uint32_t)_a);
 				vc4_parameter m(ParameterTypes::IMMEDIATE, (uint32_t)_m);
-				vc4_parameter H_(ParameterTypes::DATA, H[_H]);
+				vc4_parameter H_(ParameterTypes::DATA, G[_H]);
 				vc4_parameter h_(ParameterTypes::DATA, _h>=15?"":(string("+r")+std::to_string(_h)));
 				vc4_parameter imm(ParameterTypes::IMMEDIATE, (uint32_t)im);
 				vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)rs);
@@ -127,17 +128,17 @@ namespace disasm {
 				vc4_parameter IF(ParameterTypes::DATA, ifz);
 				vc4_parameter SETF(ParameterTypes::DATA, setf?"SETF":"");
 
-				rv->addParameter("D", D)->addParameter("d", d)->addParameter("G", G)->addParameter("a", a_)
+				rv->addParameter("D", D)->addParameter("d", d)->addParameter("G", G_)->addParameter("a", a_)
 					->addParameter("m", m)->addParameter("H", H_)->addParameter("h1", h_)->addParameter("i", imm)
 					->addParameter("s", s)->addParameter("h2", _h_)->addParameter("REP", REP)->addParameter("IFZ", IF)
 					->addParameter("SETF", SETF);
 			} else if( !((insn.mid >> 10) & 1) ) {
-				string _k(H[((insn.end >> 2) & 0xf)]);
+				string _k(G[((insn.end >> 2) & 0xf)]);
 				string _K(G[(insn.end & 3)]);
 				string ACC_(S[((insn.end >> 6) & 0x3f)]);
-				string ifz(vector_flags[p+2]);
+				string ifz(vector_flags_w[p+2]);
 			  uint8_t _m = (insn.trail & 0xf);
-				string _H(H[((insn.trail >> 4) & 3)]);
+				string _H(G[((insn.trail >> 4) & 3)]);
 				string h((((insn.trail >> 6) & 0xf)>=15?"":(string("+r")+std::to_string(((insn.trail >> 6) & 0xf)))));
 				string _G(G[(insn.mid >> 10) & 3]);
 				string g((((insn.trail >> 12) & 0xf)>=15?"":(string("+r")+std::to_string(((insn.trail >> 12) & 0xf)))));
@@ -181,9 +182,9 @@ namespace disasm {
 				// v{W}{M} {D}{d}{G}{g}, {A}[y={a}, x={m}]{H}{h}, {imm} {REPS} {IFZ} {SETF} {ACC}
 				uint32_t _b = ((insn.end & 0x3f) * 1024);
 				string _ACC(S[((insn.end) >> 6) & 0x3f]);
-				string _IFZ(vector_flags[p+2]);
+				string _IFZ(vector_flags_w[p+2]);
 				uint8_t  _m = (insn.trail & 0xf);
-				string _H(H[(insn.trail >> 4) & 3]);
+				string _H(G[(insn.trail >> 4) & 3]);
 				string _h((((insn.trail >> 6) & 0xf)>=15?"":(string("+r")+std::to_string(((insn.trail >> 6) & 0xf)))));
 				string _G(G[(insn.trail >> 10) & 3]);
 				string _g((((insn.trail >> 12) & 0xf)>=15?"":(string("+r")+std::to_string(((insn.trail >> 12) & 0xf)))));
@@ -204,16 +205,16 @@ namespace disasm {
 				vc4_parameter rAa(ParameterTypes::IMMEDIATE, (uint32_t)_a);
 				vc4_parameter rAm(ParameterTypes::IMMEDIATE, (uint32_t)_m);
 				vc4_parameter rAH(ParameterTypes::DATA, _H);
-				vc4_parameter rAHh(ParamterTypes::DATA, _h);
+				vc4_parameter rAHh(ParameterTypes::DATA, _h);
 				vc4_parameter imm(ParameterTypes::IMMEDIATE, (uint32_t)im);
 				vc4_parameter REPS(ParameterTypes::DATA, reps);
 				vc4_parameter IFZ(ParameterTypes::DATA, _IFZ);
-				vc4_parameter SETF(ParameterTypes::DATA, setf?"SETF":"");
+				vc4_parameter SETF(ParameterTypes::DATA, (((insn.mid >> 11)& 1) == 1)?"SETF":"");
 				vc4_parameter ACC(ParameterTypes::DATA, _ACC);
 
-				rv->addParameter("D", D)->addParameter("d", d)->addParameter("G", G_)->addParameter("g", _g)
-					->addParameter("A", A_)->addParameter("a", a_)->addParameter("m", m_)->addParameter("H", H_)
-					->addParameter("h", _h)->addParamter("imm", imm)->addParameter("REP", REPS)
+				rv->addParameter("D", rD)->addParameter("d", rDd)->addParameter("G", rDG)->addParameter("g", rDGg)
+					->addParameter("A", rA)->addParameter("a", rAa)->addParameter("m", rAm)->addParameter("H", rAH)
+					->addParameter("h", rAHh)->addParameter("imm", imm)->addParameter("REP", REPS)
 					->addParameter("IFZ", IFZ)->addParameter("SETF", SETF)->addParameter("ACC", ACC);
 			} else {
 				rv = new vector80_insn("*unknown*", "");
@@ -223,8 +224,8 @@ namespace disasm {
 		}
 
 		vector80_insn *vector80alu(v80_dmap insn) {
-			/*
-			*/
+			vector80_insn *rv;
+			
 			string sz(((insn.first >> 9) & 1)==1?"32":"16");
 			uint8_t opc = (insn.first >> 3) & 0x3f;
 			string opname("v");
@@ -235,9 +236,9 @@ namespace disasm {
 			uint8_t _a = ((insn.mid >> 12) & 0x3f);
 			string setf((((insn.mid >> 11) & 1) == 1)?"SETF":"");
 			uint8_t f_i = (insn.end >> 6) & 0x7f;
-			string ifz(vector_flags[((insn.end >> 13) & 7)+2]);
+			string ifz(vector_flags_w[((insn.end >> 13) & 7)+2]);
 			uint8_t _m = insn.trail & 0xf;
-			string _H(H[((insn.trail >> 4) & 3)]);
+			string _H(G[((insn.trail >> 4) & 3)]);
 			uint8_t __h = ((insn.trail >> 6) & 0xf);
 			string _h( __h==15?"":string("+r")+std::to_string(__h));
 			string _G(G[((insn.trail >> 10) & 3)]);
@@ -293,7 +294,6 @@ namespace disasm {
 				vc4_parameter a_(ParameterTypes::IMMEDIATE, (uint32_t)_a);
 				vc4_parameter b_(ParameterTypes::IMMEDIATE, (uint32_t)_b);
 				vc4_parameter m_(ParameterTypes::IMMEDIATE, (uint32_t)_m);
-				vc4_parameter _imm(ParameterTypes::IMMEDIATE, (uint32_t)imm);
 
 				vc4_parameter H_(ParameterTypes::DATA, _H);
 				vc4_parameter h_(ParameterTypes::DATA, _h);
@@ -309,7 +309,7 @@ namespace disasm {
 				rv->addParameter("D", D_)->addParameter("d", d_)->addParameter("G", G_)->addParameter("d", g_)
 					->addParameter("A", A_)->addParameter("a", a_)->addParameter("m", m_)
 					->addParameter("H", H_)->addParameter("h", h_)
-					->addParameter("B", _B)->addParameter("b", _b)->addParameter("K", K_)->addParameter("k", k_)
+					->addParameter("B", B_)->addParameter("b", b_)->addParameter("K", K_)->addParameter("k", k_)
 					->addParameter("REPS", R_)->addParameter("IFZ", I_)->addParameter("SETF", SF)->addParameter("X", AC);
 			}
 
