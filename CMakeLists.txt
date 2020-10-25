@@ -16,12 +16,15 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 set(Boost_USE_RELEASE_LIBS ON)
-find_package(Boost 1.67.0 REQUIRED)
+find_package(Boost 1.62.0 REQUIRED COMPONENTS mpi)
 
-include_directories(${Boost_INCLUDE_DIRS})
-# we're not using any libs, just header-only implementations
-# target_link_libraries(disasm_test ${Boost_LIBRARIES})
-
+if (Boost_FOUND)
+	include_directories(${Boost_INCLUDE_DIRS})
+	message(STATUS "Boost found at ${Boost_LIBRARIES}")
+	target_link_libraries(disasm_test ${Boost_LIBRARIES})
+else()
+	message(FATAL "Boost not found or a required component not found")
+endif()
 
 TEST_BIG_ENDIAN(IS_BE)
 if(IS_BE)
