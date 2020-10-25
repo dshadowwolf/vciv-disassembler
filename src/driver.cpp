@@ -3,6 +3,7 @@
 #include <disasm_scalar32.hpp>
 #include <disasm_scalar48.hpp>
 #include <disasm_vector48.hpp>
+#include <disasm_vector80.hpp>
 #include <disasm_insn_raw.hpp>
 
 #include <vector>
@@ -95,7 +96,7 @@ int main(int argc, char *argv[]) {
         else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
         else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work);
         else if ( qsz == 30 ) ci = disasm::vector48::getInstruction(work);
-        else if ( qsz == 31 ) ci = NULL;
+        else if ( qsz == 31 ) ci = disasm::vector80::getInstruction(work);
         else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
         if (ci != NULL) {
