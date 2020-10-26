@@ -30,7 +30,7 @@ namespace disasm {
 		"fmax", "frcp", "frsqrt", "fnmul", "fmin",
 		"fceil", "ffloor", "flog2", "fexp2" };
 
-	const string vector_widths[] = { "8", "16", "32", "[8]" };
+	const string vector_widths[] = { "8", "16", "32", "<unknown>" };
 
 	const string vector_ops_48[] = { "ld", "lookupmh", "lookupml",
 		"mem03[unused]", "st", "indexwritemh", "indexwriteml", "mem07[unused]",
@@ -42,7 +42,7 @@ namespace disasm {
 		"mem29[unused]", "mem30[unused]", "mem31[unused]" };
 
 	const string vector_flags_w[] = { "", "NV", "IFNZ", "IFN", "IFNN", "IFC", "IFNC" };
-
+	
 	const string vector_ops_full[] = { "mov", "bitplanes", "even", "odd", "interl",
 		"interh", "brev", "ror", "shl", "shls", "lsr", "asr", "signshl", "op13[unused]",
 		"signasl", "signasls", "and", "or", "eor", "bic", "count", "msb","op22[unused]",
