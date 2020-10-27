@@ -8,6 +8,13 @@ using namespace std;
 
 namespace disasm {
 	namespace vector80 {
+		enum V80_FLAGS {
+			BASE = 0,
+			HASA = 1,
+			HASB,
+			HASD
+		};
+
 		struct v80_dmap {
 			uint16_t first;
 			uint32_t mid;
@@ -22,97 +29,160 @@ namespace disasm {
 			}
 		};
 
+		struct v80_shared {
+			uint8_t opcode;
+			uint8_t Ra_x;
+			uint16_t d;
+			uint16_t a;
+			uint16_t b;
+			string reps;
+			string ifz;
+			string setf;
+			string width;
+			string flags_s;
+
+			v80_shared() {
+				Ra_x = opcode = d = a = b = 0;
+				reps = ifz = setf = width = string("");
+			}
+
+#define CHECKFLAG(f, F) ((F)==BASE?true:!!(((f) & (1 << (F))>>(F))))
+			void load(v80_dmap insn, uint8_t flags) {
+				// the instruction repeat count is always the first 3 bits of insn.first
+				reps = string(vector_reps[insn.first & 7]);
+
+				// Ra_x is always the first 4 bits (ie (v) & 0xf) of insn.trail
+				Ra_x = (insn.trail & 0xf);
+
+				// setf is always 11 bits into insn.mid
+				setf = string(((insn.mid >> 10)&1)==1?"SETF":"");
+				// ifz is always the top 3 bits of insn.end
+				ifz = string(vector_flags_w[((insn.end >> 13) & 7)]);
+
+				// adjust things so the final creation of `string flags_s` works
+				if (ifz.length() > 0 || (ifz.length() == 0 && reps.length() >0))
+						setf += " ";
+
+				if (ifz.length() > 0 && reps.length() > 0) {
+					if( setf.length() > 0 ) setf += " ";
+					ifz += " ";
+				}
+
+				// make the flags_s variable
+				flags_s = string("")+setf+ifz+reps;
+
+				// variable size/position stuff
+				// if the instruction opens with the first byte having the top 6 bits set
+				// we're in an ALU op and the instruction is a full 6 bits with the size
+				// being flatly 16 or 32 bits depending on bit 2 of the top byte.
+				uint8_t op_base;
+				if (CHECKFLAG(insn.first, 10)) {
+					op_base = ((insn.first >> 3) & 0x3f);
+					width = string((((insn.first >> 9) & 1) == 1)?"32":"16");
+				} else {
+					op_base = ((insn.first >> 5) & 0x1f);
+					width = vector_widths[((insn.first) >> 3) & 3];
+				}
+
+				// regardless, if we have `HASD` set in our input flags, we can
+				// find it in a fixed location.
+				if (CHECKFLAG(flags, V80_FLAGS::HASD))
+					d = ((insn.mid >> 22) & 0x3ff);
+				// and if `HASA`, the same thing
+				if (CHECKFLAG(flags, V80_FLAGS::HASA))
+					a = ((insn.mid >> 12) & 0x3ff);
+				// same for `HASB`
+				if (CHECKFLAG(flags, V80_FLAGS::HASB))
+					b = (insn.mid & 0x3ff);
+			}
+		};
+
+#undef CHECKFLAG
 
 		string make_reg_add(uint8_t rr) {
 			return rr==15?string(""):(string("+r")+std::to_string(rr));
 		}
 
 		vector80_insn *v80rni(v80_dmap insn) {
-			uint8_t op_base = (insn.first >> 5) & 0x1f;
-			string insn_rep = vector_reps[insn.first & 7];
-			string memwid(vector_widths[((insn.first >> 3) & 3)]);
-			string rd = disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff);
-			string setf = (((insn.mid >> 11) & 1) == 1)?"SETF ":"";
-			string rd_add = make_reg_add((insn.trail >> 12) & 0xf);
-			uint8_t offset_add = (insn.mid & 0x7f);
-			uint8_t offset_reg = ((insn.end >> 2) & 0xf);
-			uint32_t offset_base = (((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3);
-			uint32_t offset = (offset_base*128)+offset_add;
+			v80_shared cmn;
+			cmn.load(insn, ((uint8_t)(1 << V80_FLAGS::HASD)));
 
-			string ifz(vector_flags_w[((insn.end >> 13) & 7)]);
-			string opname;
-			opname += "v" + memwid + vector_ops_48[op_base];
+			string opname("v");
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
-			if(ifz.length() > 0) ifz += " ";
+			// now get the stuff somewhat specific to this encoding
+			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
+			uint32_t offset = ((((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3));
+			offset *= 128;
+			offset |= (insn.mid & 0x7f);
+			uint32_t o_r = ((insn.end >> 2) & 0xf);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, rd);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
 			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
-			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)offset_reg);
+			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
 			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+insn_rep));
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
 			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
 				->addParameter("o", off)->addParameter("F", flags);
 
 			return rv;
 		}
 
+#define F(S) (1 << 2)
+
 		vector80_insn *v80nri(v80_dmap insn) {
-			uint8_t op_base = (insn.first >> 5) & 0x1f;
-			string insn_rep = vector_reps[insn.first & 7];
-			string memwid(vector_widths[((insn.first >> 3) & 3)]);
-			string ra = disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff);
-			string setf = (((insn.mid >> 11) & 1) == 1)?"SETF ":"";
-			string ra_add = make_reg_add((insn.trail >> 6) & 0xf);
-			uint8_t offset_add = (insn.mid & 0x7f);
-			uint8_t offset_reg = ((insn.end >> 2) & 0xf);
-			uint32_t offset_base = (((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3);
-			uint32_t offset = (offset_base*128)+offset_add;
+			v80_shared cmn;
+			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA));
 
-			string ifz(vector_flags_w[((insn.end >> 13) & 7)]);
-			string opname;
-			opname += "v" + memwid + vector_ops_48[op_base];
+			string opname("v");
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
-			if(ifz.length() > 0) ifz += " ";
+			// now get the stuff somewhat specific to this encoding
+			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
+			uint32_t offset = ((((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3));
+			offset *= 128;
+			offset |= (insn.mid & 0x7f);
+			uint32_t o_r = ((insn.end >> 2) & 0xf);
 
-			vector80_insn *rv = new vector80_insn(opname, "{A}{ra}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, ra);
-			vc4_parameter RDA(ParameterTypes::DATA, ra_add);
-			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)offset_reg);
+			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
+			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
 			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+insn_rep));
-			rv->addParameter("A", D)->addParameter("ra", RDA)->addParameter("r", rs)
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
 				->addParameter("o", off)->addParameter("F", flags);
 
 			return rv;
 		}
 
+		std::string* getRegAdds(v80_dmap insn) {
+			std::string* rv = new string[3];
+			rv[0] = make_reg_add((insn.trail >> 12) & 0xf);
+			rv[1] = make_reg_add((insn.trail >> 6) & 0xf);
+			rv[2] = make_reg_add((insn.end >> 2) & 0xf);
+			
+			return rv;
+		}
+
 		vector80_insn *v80rrr(v80_dmap insn) {
-			uint8_t op_base = (insn.first >> 5) & 0x1f;
-			string insn_rep = vector_reps[insn.first & 7];
-			string memwid(vector_widths[((insn.first >> 3) & 3)]);
-			string rd = disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff);
-			string ra = disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff);
-			string setf = (((insn.mid >> 11) & 1) == 1)?"SETF ":"";
-			string rb = disasm::vector::decode_vector_register(insn.mid & 0x3ff);
-			string rd_add = make_reg_add((insn.trail >> 12) & 0xf);
-			string ra_add = make_reg_add((insn.trail >> 6) & 0xf);
-			string rb_add = make_reg_add((insn.end >> 2) & 0xf);
-			string ifz(vector_flags_w[((insn.end >> 7) & 7)]);
+			v80_shared cmn;
+			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 
-			string opname;
-			opname += "v" + memwid + vector_ops_48[op_base];
+			string opname("v");
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
-			if(ifz.length() > 0) ifz += " ";
+			string* adds = getRegAdds(insn);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, rd);
-			vc4_parameter RD(ParameterTypes::DATA, rd_add);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, ra);
-			vc4_parameter RA(ParameterTypes::DATA, ra_add);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, rb);
-			vc4_parameter RB(ParameterTypes::DATA, rb_add);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+insn_rep));
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
+			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, cmn.b);
+			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
@@ -123,35 +193,30 @@ namespace disasm {
 		}
 
 		vector80_insn *v80rri(v80_dmap insn) {
-			uint8_t op_base = (insn.first >> 5) & 0x1f;
-			string insn_rep = vector_reps[insn.first & 7];
-			string memwid(vector_widths[((insn.first >> 3) & 3)]);
-			string rd = disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff);
-			string ra = disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff);
-			string setf = (((insn.mid >> 11) & 1) == 1)?"SETF ":"";
-			uint32_t off_add = insn.mid & 0x3ff;
-			uint32_t off_base = insn.end & 0x3f;
-			uint32_t offset = (off_base << 10) | off_add;
-			string rd_add = make_reg_add((insn.trail >> 12) & 0xf);
-			string ra_add = make_reg_add((insn.trail >> 6) & 0xf);
-			string ifz(vector_flags_w[((insn.end >> 7) & 7)]);
+			v80_shared cmn;
+			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 
-			string opname;
-			opname += "v" + memwid + vector_ops_48[op_base];
+			string opname("v");
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
-			if(ifz.length() > 0) ifz += " ";
+			string rd_add(make_reg_add((insn.trail >> 6) & 0xf));
+			string ra_add(make_reg_add((insn.end >> 2) & 0xf));
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {i} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, rd);
+			uint32_t j = insn.end & 0x3f;
+			uint32_t l = ((insn.mid >> 12) & 0x3ff);
+			uint32_t offset = ((j << 10) | l);
+
+			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {imm} {F}");
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
 			vc4_parameter RD(ParameterTypes::DATA, rd_add);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, ra);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
 			vc4_parameter RA(ParameterTypes::DATA, ra_add);
-			vc4_parameter I(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+insn_rep));
+			vc4_parameter IMM(ParameterTypes::IMMEDIATE, offset);
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
-				->addParameter("i", I)->addParameter("F", flags);
+				->addParameter("imm", IMM)->addParameter("F", flags);
 
 			return rv;
 		}
@@ -166,31 +231,21 @@ namespace disasm {
 		}
 
 		vector80_insn *v80arrr(v80_dmap insn) {
-			string size((((insn.first >> 9) & 1) == 1)?"32":"16");
-			uint8_t op_base = (insn.first >> 3) & 0x3f; // 6 bits!
-			string reps(vector_reps[insn.first & 7]);
-			string rd = disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff);
-			string ra = disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff);
-			string setf((((insn.mid >> 11)&1)==1)?"SETF ":"");
-			string rb = disasm::vector::decode_vector_register(insn.mid & 0x3ff);
-			string rda = make_reg_add((insn.trail >> 12) & 0xf);
-			string raa = make_reg_add((insn.trail >> 6) & 0xf);
-			string rba = make_reg_add((insn.end >> 2) & 0xf);
-			string ifz(vector_flags_w[((insn.end >> 7) & 7)]);
+			v80_shared cmn;
+			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			string opname("v");
+			opname += cmn.width + vector_ops_full[cmn.opcode];
 
-			if(ifz.length() > 0) ifz += " ";
-
-			string opname;
-			opname += "v" + size + vector_ops_full[op_base];
+			string* adds = getRegAdds(insn);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, rd);
-			vc4_parameter RD(ParameterTypes::DATA, rda);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, ra);
-			vc4_parameter RA(ParameterTypes::DATA, raa);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, rb);
-			vc4_parameter RB(ParameterTypes::DATA, rba);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+reps));
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
+			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, cmn.b);
+			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
@@ -201,31 +256,24 @@ namespace disasm {
 		}
 
 		vector80_insn *v80arri(v80_dmap insn) {
-			string size((((insn.first >> 9) & 1) == 1)?"32":"16");
-			uint8_t op_base = (insn.first >> 3) & 0x3f; // 6 bits!
-			string reps(vector_reps[insn.first & 7]);
-			string rd = disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff);
-			string ra = disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff);
-			string setf((((insn.mid >> 11)&1)==1)?"SETF ":"");
+			v80_shared cmn;
+			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			string opname("v");
+			opname += cmn.width + vector_ops_full[cmn.opcode];
+
+			string* adds = getRegAdds(insn);
+
 		  uint32_t off_add = insn.mid & 0x3ff;
 			uint32_t off_base = insn.end & 0x3f;
 			uint32_t offset = (off_base << 10) | off_add;
-			string rda = make_reg_add((insn.trail >> 12) & 0xf);
-			string raa = make_reg_add((insn.trail >> 6) & 0xf);
-			string ifz(vector_flags_w[((insn.end >> 7) & 7)]);
-
-			if(ifz.length() > 0) ifz += " ";
-
-			string opname;
-			opname += "v" + size + vector_ops_full[op_base];
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {i} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, rd);
-			vc4_parameter RD(ParameterTypes::DATA, rda);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, ra);
-			vc4_parameter RA(ParameterTypes::DATA, raa);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
 			vc4_parameter I(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, string(setf+ifz+reps));
+			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
