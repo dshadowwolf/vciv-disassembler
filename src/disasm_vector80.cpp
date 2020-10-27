@@ -32,9 +32,9 @@ namespace disasm {
 		struct v80_shared {
 			uint8_t opcode;
 			uint8_t Ra_x;
-			uint16_t d;
-			uint16_t a;
-			uint16_t b;
+			string d;
+		  string a;
+			string b;
 			string reps;
 			string ifz;
 			string setf;
@@ -42,11 +42,11 @@ namespace disasm {
 			string flags_s;
 
 			v80_shared() {
-				Ra_x = opcode = d = a = b = 0;
-				reps = ifz = setf = width = string("");
+				Ra_x = opcode = 0;
+				d = a = b = reps = ifz = setf = width = string("");
 			}
 
-#define CHECKFLAG(f, F) ((F)==BASE?true:!!(((f) & (1 << (F))>>(F))))
+#define CHECKFLAG(f, F) ((F)==BASE?true:!!(((f) & (1 << (F)))))
 			void load(v80_dmap insn, uint8_t flags) {
 				// the instruction repeat count is always the first 3 bits of insn.first
 				reps = string(vector_reps[insn.first & 7]);
@@ -87,13 +87,13 @@ namespace disasm {
 				// regardless, if we have `HASD` set in our input flags, we can
 				// find it in a fixed location.
 				if (CHECKFLAG(flags, V80_FLAGS::HASD))
-					d = ((insn.mid >> 22) & 0x3ff);
+					d = string(disasm::vector::decode_vector_register((insn.mid >> 22) & 0x3ff));
 				// and if `HASA`, the same thing
 				if (CHECKFLAG(flags, V80_FLAGS::HASA))
-					a = ((insn.mid >> 12) & 0x3ff);
+					a = string(disasm::vector::decode_vector_register((insn.mid >> 12) & 0x3ff));
 				// same for `HASB`
 				if (CHECKFLAG(flags, V80_FLAGS::HASB))
-					b = (insn.mid & 0x3ff);
+					b = string(disasm::vector::decode_vector_register(insn.mid & 0x3ff));
 			}
 		};
 
@@ -104,11 +104,11 @@ namespace disasm {
 		}
 
 		vector80_insn *v80rni(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, ((uint8_t)(1 << V80_FLAGS::HASD)));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, ((uint8_t)(1 << V80_FLAGS::HASD)));
 
 			string opname("v");
-			opname += cmn.width + vector_ops_48[cmn.opcode];
+			opname += cmn->width + vector_ops_48[cmn->opcode];
 
 			// now get the stuff somewhat specific to this encoding
 			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
@@ -118,25 +118,25 @@ namespace disasm {
 			uint32_t o_r = ((insn.end >> 2) & 0xf);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
 			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
 			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
 				->addParameter("o", off)->addParameter("F", flags);
 
 			return rv;
 		}
 
-#define F(S) (1 << 2)
+#define F(S) (1 << S)
 
 		vector80_insn *v80nri(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA));
 
 			string opname("v");
-			opname += cmn.width + vector_ops_48[cmn.opcode];
+			opname += cmn->width + vector_ops_48[cmn->opcode];
 
 			// now get the stuff somewhat specific to this encoding
 			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
@@ -146,11 +146,11 @@ namespace disasm {
 			uint32_t o_r = ((insn.end >> 2) & 0xf);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
 			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
 			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
 				->addParameter("o", off)->addParameter("F", flags);
 
@@ -167,22 +167,22 @@ namespace disasm {
 		}
 
 		vector80_insn *v80rrr(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 
 			string opname("v");
-			opname += cmn.width + vector_ops_48[cmn.opcode];
+			opname += cmn->width + vector_ops_48[cmn->opcode];
 
 			string* adds = getRegAdds(insn);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
 			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, cmn.b);
+			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, string(cmn->b));
 			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
@@ -193,26 +193,26 @@ namespace disasm {
 		}
 
 		vector80_insn *v80rri(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
 
 			string opname("v");
-			opname += cmn.width + vector_ops_48[cmn.opcode];
+			opname += cmn->width + vector_ops_48[cmn->opcode];
 
 			string rd_add(make_reg_add((insn.trail >> 6) & 0xf));
 			string ra_add(make_reg_add((insn.end >> 2) & 0xf));
 
 			uint32_t j = insn.end & 0x3f;
-			uint32_t l = ((insn.mid >> 12) & 0x3ff);
+			uint32_t l = (insn.mid & 0x3ff);
 			uint32_t offset = ((j << 10) | l);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {imm} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RD(ParameterTypes::DATA, rd_add);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
 			vc4_parameter RA(ParameterTypes::DATA, ra_add);
 			vc4_parameter IMM(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
@@ -231,21 +231,21 @@ namespace disasm {
 		}
 
 		vector80_insn *v80arrr(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 			string opname("v");
-			opname += cmn.width + vector_ops_full[cmn.opcode];
+			opname += cmn->width + vector_ops_full[cmn->opcode];
 
 			string* adds = getRegAdds(insn);
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
 			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, cmn.b);
+			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, string(cmn->b));
 			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
@@ -256,10 +256,10 @@ namespace disasm {
 		}
 
 		vector80_insn *v80arri(v80_dmap insn) {
-			v80_shared cmn;
-			cmn.load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+			v80_shared *cmn = new v80_shared();
+			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
 			string opname("v");
-			opname += cmn.width + vector_ops_full[cmn.opcode];
+			opname += cmn->width + vector_ops_full[cmn->opcode];
 
 			string* adds = getRegAdds(insn);
 
@@ -268,12 +268,12 @@ namespace disasm {
 			uint32_t offset = (off_base << 10) | off_add;
 
 			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {i} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, cmn.d);
+			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
 			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, cmn.a);
+			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
 			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
 			vc4_parameter I(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn.flags_s);
+			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 
 			rv->addParameter("D", D)->addParameter("rd", RD)
 				->addParameter("A", A)->addParameter("ra", RA)
