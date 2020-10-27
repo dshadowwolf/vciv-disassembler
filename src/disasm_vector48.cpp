@@ -1,3 +1,4 @@
+#include <disasm_config.h>
 #include <disasm_vector48.hpp>
 #include <vc4_data.hpp>
 #include <vector_helpers.hpp>
@@ -5,139 +6,199 @@
 using namespace std;
 
 namespace disasm {
-    namespace vector48 {
-        vector48_insn *vector48memory(uint64_t insn) {
-            uint8_t w = ((insn >> 35) & 0x03);
-            uint8_t check = ((insn >> 37) & 0x1f);
-            string mop(vector_ops_48[check]);
-            string width(check==24?"":vector_widths[w]);
-            string opc("v");
-            opc += width;
-            opc += mop;
+	namespace vector48 {
+		enum v48flags {
+			SIXBIT = 1,
+			HASA = 2,
+			HASB = 4,
+			HASD = 8,
+			IMM = 16,
+			ISMEM = 32,
+			SETF = 64,
+			IFZ = 128
+		};
 
-            string dest_register = disasm::vector::decode_vector_register((insn >> 22) & 0x03ff);
-            string source_register_a = disasm::vector::decode_vector_register((insn >> 12) & 0x03ff);
-            
-            bool has_p = ((insn >> 10) & 1) == 1;
-            bool pf = ((insn >> 7) & 7) == 7;
+		struct v48_shared {
+			string operation;
+			string width;
+			string setf;
+			string ifz;
+			string flags_s;
+			string d;
+			string a;
+			string b;
+			string rs;
+			uint8_t rb;
+			uint8_t imm;
 
-            string flags;
-            uint8_t p;
+			v48_shared(uint64_t insn, uint8_t flags) {
+				string rop;
+#define CHECK(v, f) ((v & f) != 0)
+				if (CHECK(flags, v48flags::SIXBIT)) {
+					uint8_t raw_op = (insn >> 35) & 0x3f;
+					bool x_set = (((insn >> 41)&1) == 1);
+					bool opalt = ((raw_op >= 48) && x_set);
+					rop = opalt?vector48_alts[raw_op - 48]:vector_ops_full[raw_op];
+					width = string(x_set?"32":"16");
+					operation = string("v")+width+rop;
+				} else {
+					uint8_t raw_op = ((insn >> 37) & 0x1f);
+					if (CHECK(flags, ISMEM)) {
+						rop = vector_ops_48[raw_op];
+					}
+					width = string(vector_widths[((insn >>35) & 3)]);
+					operation = string("v")+width+rop;
+				}
 
-            if (((insn >> 6) & 1) && (has_p || (((insn >> 7) & 7) == 7))) flags += " SETF";
-            
-            if (has_p) flags += " " + vector_flags_w[pf];
+				if (CHECK(flags, v48flags::SETF))
+					setf = ((insn >> 6)&1)?"SETF":"";
+				else
+					setf = string("");
 
-            if (has_p) {
-                p = (insn & 0x003f);
-            }
+				if (CHECK(flags, v48flags::IFZ))
+					ifz = vector_flags_w[(insn >> 6) & 7];
 
-            vc4_parameter d(ParameterTypes::VECTOR_REGISTER, dest_register);
-            vc4_parameter a(ParameterTypes::VECTOR_REGISTER, source_register_a);
-            vc4_parameter o(ParameterTypes::ERROR, 0);
-            
-            if (has_p)
-                o = vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x0000003f));
-            else if(pf)
-                o = vc4_parameter(ParameterTypes::REGISTER, (uint32_t)(insn & 0x0000003f));
-            else
-                o = vc4_parameter(ParameterTypes::VECTOR_REGISTER, disasm::vector::decode_vector_register(insn & 0x000003ff));
+				if (setf.length() > 0 && ifz.length() > 0) {
+					setf += " ";
+				}
 
-            uint8_t rs = ((insn & 0x000007000000) >> 32);
-            string fmt;
-            if (rs > 0)
-                fmt = string("{d}+r{s}") + (source_register_a == "DISCARD-IGNORE" ? "" : ", {a}+r{s}");
-            else
-                fmt = string("{d}") + (source_register_a == "DISCARD-IGNORE" ? "" : ", {a}");//+", {o} {flags}";
+				flags_s = setf+ifz;
 
-            if (has_p) {
-                fmt += ", {o}";
-            } else if(pf) {
-                fmt += ", (r{o})";
-            } else if (!has_p && !pf) {
-                if (rs > 0) fmt += ", {o}+r{s}";
-                else fmt += ", {o}";
-            }
+				// no need to actually check flags, all VECTOR48 ops
+				// have both D and A registers.
+				d = disasm::vector::decode_vector_register(((insn >> 22) & 0x3ff));
+				a = disasm::vector::decode_vector_register(((insn >> 12) & 0x3ff));
+				uint8_t rrs = ((insn >> 32) & 7);
+				rs = string(rrs==0?"":("+r"+std::to_string(rrs)));
 
-            fmt += " {flags}";
+				if(CHECK(flags, v48flags::HASB))
+					b = disasm::vector::decode_vector_register(insn & 0x3ff);
 
-            vc4_parameter flag_p(ParameterTypes::DATA, flags);
-            vector48_insn *rv = new vector48_insn(opc, fmt);
-            rv->addParameter("d", d)->addParameter("a", a)
-                ->addParameter("o", o)
-                ->addParameter("flags", flag_p)
-                ->addParameter("s", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(rs)));
-            
-            return rv;
-        }
+				if(!CHECK(flags, v48flags::IFZ) && !CHECK(flags, v48flags::HASB) && !CHECK(flags, v48flags::IMM))
+					rb = insn & 0x3f;
 
-        vector48_insn *vector48data(uint64_t insn) {
-            uint8_t opc = ((insn >> 35) & 0x3f);
-            string vop(vector_ops_full[opc]);
-            bool X = !!((insn >> 41) & 0x01);
-            if (opc < 48) vop += (X?".h":".l");
-            else if (X) {
-                vop = std::string(vector48_alts[opc - 48]);
-            }
+				if(CHECK(flags, v48flags::IMM))
+					imm = insn & 0x3f;
+			}
+#undef CHECK
+		};
 
-            string dr(disasm::vector::decode_vector_register((insn >> 22) & 0x000000000000000003ff ));
-            string ar(disasm::vector::decode_vector_register((insn >> 12) & 0x000000000000000003ff ));
-            string flags;
-            
-            vc4_parameter d(ParameterTypes::VECTOR_REGISTER, dr);
-            vc4_parameter a(ParameterTypes::VECTOR_REGISTER, ar);
-            vc4_parameter o(ParameterTypes::ERROR, 0);
-            
-            if (insn >> 7 & 0x00000007) {
-                if ( (insn >> 6) & 1 ) flags += "SETF";
-                o = vc4_parameter(ParameterTypes::REGISTER, (uint32_t)(insn & 0x3f));
-            } else if((insn >> 10) & 1) {
-                if ( (insn >> 6) & 1 ) flags += "SETF";
-                flags += " " + vector_flags_w[(insn >> 7) & 7];
-                o = vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x3f));
-            } else {
-                o = vc4_parameter(ParameterTypes::VECTOR_REGISTER, disasm::vector::decode_vector_register(insn & 0x000003ff));
-            }
+		std::string make_format(v48_shared s, uint8_t type) {
+			std::string rv;
+			if (s.d != "DISCARD-IGNORE")
+				rv += "{D}{d}, ";
+			if (s.a != "DISCARD-IGNORE")
+				rv += "{A}{d}, ";
 
-            uint8_t rsd = ((insn & 0x000007000000) >> 32);
+			switch(type) {
+			case 1:
+				rv += "(r{rb}) ";
+				break;
+			case 2:
+				if (s.b != "DISCARD-IGNORE")
+					rv += "{B}{d} ";
+			  break;
+			case 3:
+				rv += "{imm}";
+				break;
+			}
+			rv += "{F}";
+			return rv;
+		}
 
-            string fmt;
-            if (rsd > 0)
-                fmt = "{d}+r{s}, {a}+r{s}, {o} {flags}";
-            else
-                fmt = "{d}, {a}, {o} {flags}";
-            vc4_parameter flag_p(ParameterTypes::DATA, flags);
-            vector48_insn *rv = new vector48_insn(vop, fmt);
-            rv->addParameter("d", d)->addParameter("a", a)
-                ->addParameter("o", o)
-                ->addParameter("flags", vc4_parameter(ParameterTypes::DATA, flags))
-                ->addParameter("s", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(rsd)));
-            
-            return rv;
-        }
-        
-        vector48_insn *getInstruction(uint8_t *buffer) {
-            // read the instruction and check the type
-            // this should be possible by checking for
-            // certain bit-patterns
-            uint64_t insn = (uint16_t)(*((uint16_t *)buffer));
-            insn <<= 32;
-            uint16_t param_high = (uint16_t)(*((uint16_t *)(buffer+2)));
-            uint16_t param_low = (uint16_t)(*((uint16_t *)(buffer+4)));
-            uint32_t param = param_high;
-            param <<= 16;
-            param |= param_low;
-            insn |= param;
+		vector48_insn *vector48mrro(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::ISMEM);
+			std::string fmt(make_format(cmn, 1));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("rb", vc4_parameter(ParameterTypes::REGISTER, (uint32_t)cmn.rb))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
+			return rv;
+		}
 
-            uint8_t op_class = insn >> 42;
-            op_class &= 0x01; // though 2 bits are set aside for this
-                              // only 1 of those bits is used
+		vector48_insn *vector48mrrr(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::HASB|v48flags::ISMEM);
+			std::string fmt(make_format(cmn, 2));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("B", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.b))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, string("")));
+			return rv;
+		}
 
-            if (op_class) return vector48data(insn);
-            else return vector48memory(insn);
-            
-            assert("Code Should Not Hit This!");
-            return NULL;
-        }
-    }
+		vector48_insn *vector48mrri(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::IFZ|v48flags::IMM|v48flags::ISMEM);
+			std::string fmt(make_format(cmn, 3));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("imm", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)cmn.imm))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
+			return rv;
+		}
+
+		vector48_insn *vector48drro(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::SETF);
+			std::string fmt(make_format(cmn, 1));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("rb", vc4_parameter(ParameterTypes::REGISTER, (uint32_t)cmn.rb))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
+			return rv;
+		}
+
+		vector48_insn *vector48drrr(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::HASB);
+			std::string fmt(make_format(cmn, 2));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("B", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.b))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, string("")));
+			return rv;
+		}
+
+		vector48_insn *vector48drri(uint64_t insn) {
+			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::IFZ|v48flags::IMM);
+			std::string fmt(make_format(cmn, 3));
+			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
+			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
+				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
+				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
+				->addParameter("imm", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)cmn.imm))
+				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
+			return rv;
+		}
+
+		vector48_insn *v48m_dispatch(uint64_t insn) {
+			if (((insn >> 7) & 7) == 7) return vector48mrro(insn);
+			else if (((insn >> 10) & 1) == 0) return vector48mrrr(insn);
+			else return vector48mrri(insn);
+		}
+
+		vector48_insn *v48d_dispatch(uint64_t insn) {
+			if (((insn >> 7) & 7) == 7) return vector48drro(insn);
+			else if (((insn >> 10) & 1) == 0) return vector48drrr(insn);
+			else return vector48drri(insn);
+		}
+
+		vector48_insn *getInstruction(uint8_t *buffer) {
+			uint64_t insn = READ_WORD(buffer);
+			insn <<= 16;
+			insn |= READ_WORD(buffer+2);
+			insn <<= 16;
+			insn |= READ_WORD(buffer+4);
+			//insn &= 0x0000ffffff;
+			if ((insn >> 42) & 1) return v48d_dispatch(insn);
+			else return v48m_dispatch(insn);
+		}
+	}
 }
