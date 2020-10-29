@@ -430,3 +430,6 @@ namespace disasm {
 		}
 	}
 }
+
+#undef INSTRUCTION_TYPE
+#undef INSTRUCTION_STORAGE

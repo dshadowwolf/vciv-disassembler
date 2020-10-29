@@ -6,11 +6,12 @@
 using namespace std;
 
 namespace disasm {
-    class scalar32_insn : public vc4_insn {
-        public:
-            inline scalar32_insn(string insn_name, string format)
-                : vc4_insn(insn_name, string("{name} ")+format, 32) {};
-   };
+	class scalar32_insn : public vc4_insn {
+	public:
+		inline scalar32_insn(string insn_name, string format)
+			: vc4_insn(insn_name, string("{name} ")+format, 32) {};
+		inline size_t getSizeBytes() { return 4; };
+	};
 };
 
 #endif // __DISASM_SCALAR32_H_

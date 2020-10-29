@@ -34,7 +34,7 @@ namespace disasm {
 		inline string getReadable() { return name; };
 		inline uint8_t getSize() { return size; }
 		inline size_t getSizeBytes() { return (size_t)(size / 8); };
-		inline string toString() {
+		string toString() {
 			assert( format.length() > 0 && "No format string!");
 			string rv(format);
 			string nm("(\\{name\\})");

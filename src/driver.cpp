@@ -89,11 +89,12 @@ int main(int argc, char *argv[]) {
 
 	close(fd);
 
+	std::cout << std::boolalpha;
+
 	while (work - buffer < st.st_size) {
 		disasm::vc4_insn *ci;
 		uint16_t insn_raw = READ_WORD(work);
 		uint8_t qsz = (((uint8_t)(insn_raw >> 8)) & 0xf8) >> 3;
-		uint8_t ssz;
 
 		if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work);
 		else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
@@ -102,21 +103,19 @@ int main(int argc, char *argv[]) {
 		else if ( qsz == 31 ) ci = disasm::vector80::getInstruction(work);
 		else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
-		if (ci != NULL) {
-			ssz = ((ci->getReadable().find("unknown")>0)?2:ci->getSizeBytes());
-			instructions.push_back(*ci);
-		} else {
-			ssz = 10;
-		}
-
-		work += ssz;
+		int32_t foundLoc = ci->getReadable().find("unknown");
+		bool known = !(foundLoc > 0);
+	  work += ((!known)?2:ci->getSizeBytes());
+		instructions.push_back(*ci);
 	}
 
 	uint32_t addr;
 	for ( auto it = instructions.begin(); it != instructions.end(); it++ ) {
 		disasm::vc4_insn curr = *it;
 
+		int32_t foundLoc = curr.getReadable().find("unknown");
+		bool known = !(foundLoc > 0);
 		std::cout << (boost::format { "0x%08X" } % addr ).str() << "\t" << curr.toString() << std::endl;
-		addr += ((curr.getReadable().find("unknown")>0)?2:curr.getSizeBytes());
+	  addr += ((!known)?2:curr.getSizeBytes());
 	}
 }
