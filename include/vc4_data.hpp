@@ -24,7 +24,7 @@ namespace disasm {
 		"vc", "gt", "lte", "gte", "lt", "gt",
 		"lte", "ra", ".never" };
 
-	const string mem_op_widths[] = { "", "h", "b", "s"};
+	const string mem_op_widths[] = { ".u32", ".u16", ".u8", ".s"};
 
 	const string float_ops[] = { "fadd", "fsub", "fmul", "fabs", "frsub",
 		"fmax", "frcp", "frsqrt", "fnmul", "fmin",

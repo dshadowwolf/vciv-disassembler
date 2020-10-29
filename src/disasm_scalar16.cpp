@@ -14,31 +14,32 @@ namespace disasm {
 			std::any argv;
 			string noargs[] = { "bkpt", "nop", "sleep", "user", "ei", "di", "cbclr",
 				"cbadd1", "cbadd2", "cbadd3", "rti" };
+			uint16_t mask = 0x001f;
+			ParameterTypes type = ParameterTypes::REGISTER;
+
 			if (insn < 10) rv = new scalar16_insn(noargs[insn], "");
-			else if (insn >= 10 && insn <= 31) return new scalar16_insn("*unknown*", "");
+			else if (insn >= 10 && insn <= 31) return new scalar16_insn("*unknown scalar16 simple*", "");
 			else if ((insn & 0x0080) && !(insn & 0x0040)) {
-				vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
 				if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{d}");
 				else rv = new scalar16_insn("switch", "r{d}");
-				rv->addParameter("d", p);
+				mask = 0x000f;
 			} else if ((insn & 0x0040)) {
-				vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
 				if (insn & 0x0020) rv = new scalar16_insn("bl", "r{d}");
-				else rv = new scalar16_insn("b", "r{d}");
-				rv->addParameter("d", p);
-			} else if (insn & 0x0020) {
-				rv = new scalar16_insn("swi", "r{d}");
-				vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-				rv->addParameter("d", p);
-			} else if ((insn & 0x00c0) == 0x00c0) {
-				vc4_parameter p(ParameterTypes::REGISTER, (uint32_t)(0x001f));
-				rv = new scalar16_insn("version", "r{d}");
-				rv->addParameter("d", p);
-			} else {
-				vc4_parameter p(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x003f));
-				rv = new scalar16_insn("swi", "{u}");
-				rv->addParameter("u", p);
+				else rv = new scalar16_insn("b", "r{p}");
+			} else if (insn & 0x0020)
+				rv = new scalar16_insn("swi", "r{p}");
+			else if ((insn & 0x00c0) == 0x00c0)
+				rv = new scalar16_insn("version", "r{p}");
+			else {
+				rv = new scalar16_insn("swi", "{p}");
+				type = ParameterTypes::OFFSET;
+				mask = 0x003f;
 			}
+
+			if (type == ParameterTypes::OFFSET) // eg: signed
+				rv->addParameter("p", vc4_parameter(type, (int32_t)(insn & mask)));
+			else
+				rv->addParameter("p", vc4_parameter(type, (uint32_t)(insn & mask)));
 
 			return rv;
 		}
@@ -48,170 +49,129 @@ namespace disasm {
 			return bb==0?0:(bb==1?6:(bb==2?16:24));
 		}
 
-		scalar16_insn *getMemoryOperation(uint16_t insn) {
-			scalar16_insn *rv;
-			uint8_t top = (insn & 0xff00) >> 8;
+#define P(x, y) vc4_parameter((x), (y))
+#define PR(y) P(ParameterTypes::REGISTER, (y))
+#define PO(y) P(ParameterTypes::OFFSET, (y))
+#define P_I(y) P(ParameterTypes::IMMEDIATE, (y))
+#define PD(y) P(ParameterTypes::DATA, (y))
+#define NI(n, f) (new scalar16_insn((n), (f)))
 
-			switch (top) {
-			case 0:
-			case 1:
-				rv = new scalar16_insn("*unknown*", "flop");
-				break;
-			case 2:
-				do {
-					bool rm = (which_b_reg(insn)==(insn & 0x001f));
-					vc4_parameter b(ParameterTypes::REGISTER, (uint32_t)(which_b_reg(insn)));
-					vc4_parameter m(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-					bool ldst = (insn&0x0080 == 0);
-					string name(ldst?"ldm":"stm");
-					string fmt(rm?
-										 ((!ldst)?"r{b}, (--sp)":"r{b}, (sp++)"):
-										 ((!ldst)?"r{b}-r{m}, (--sp)":"r{b}-r{m},(sp++)"));
-					rv = new scalar16_insn(name, fmt);
-					rv->addParameter("b", b)->addParameter("m", m);
-				} while(0);
-				break;
-			case 3:
-				do {
-					bool rm = (which_b_reg(insn)==(insn & 0x001f));
-					vc4_parameter b(ParameterTypes::REGISTER, (uint32_t)(which_b_reg(insn)));
-					vc4_parameter m(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-					bool ldst = (insn&0x0080 == 0);
-					string name(ldst?"ldm":"stm");
-					string fmt((rm?
-											((!ldst)?"r{b}, lr, (--sp)":"r{b}, lr, (sp++)"):
-											((!ldst)?"r{b}-r{m},lr,(--sp)":"r{b}-r{m},lr,(sp++)")));
-					rv = new scalar16_insn(name, fmt);
-					rv->addParameter("b", b)->addParameter("m", m);
-				} while(0);
-				break;
-			case 4:
-			case 5:
-				do {
-					vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-					vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 4) & 0x001f));
-					rv = new scalar16_insn("ld", "r{d}, (sp+({o}*4))");
-					rv->addParameter("d", d)->addParameter("o", o);
-				} while(0);
-				break;
-			case 6:
-			case 7:
-				do {
-					vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-					vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 4) & 0x001f));
-					rv = new scalar16_insn("st", "r{d}, (sp+({o}*4))");
-					rv->addParameter("d", d)->addParameter("o", o);
-				} while(0);
-				break;
-			default:
-				do {
-					if ( top < 16 ) {
-						string opname(((top & 1) == 0)?"ld":"st");
-						vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-						vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
-						opname += mem_op_widths[(top >> 1) & 0x0003];
-						rv = new scalar16_insn(opname, "r{d}, (r{s})");
-						rv->addParameter("d", d)->addParameter("s", s);
-					} else {
-						uint8_t type = ((insn & 0xf800) >> 11);
-						switch(type) {
-						case 0:
-						case 1:
-							// how did his happen ?
-							rv = new scalar16_insn("*unknown*", "");
-							break;
-						case 2:
-							do {
-								vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-								vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 5) & 0x003f));
-								rv = new scalar16_insn("add", "r{d}, sp, {o}*4");
-								rv->addParameter("d", d)->addParameter("o", o);
-							} while(0);
-							break;
-						case 3:
-							do {
-								vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x003f));
-								string c = condition_codes[(insn >> 6) & 0x0007];
-								rv = new scalar16_insn(string("b")+c, "$+{o}*2");
-								rv->addParameter("o", o);
-							} while(0);
-							break;
-						case 4:
-						case 5:
-							do {
-								vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-								vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
-								vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 8) & 0x000f));
-								rv = new scalar16_insn("ld", "r{d}, (r{s}+{u}*4)");
-								rv->addParameter("d", d)->addParameter("s", s)->addParameter("u", u);
-							} while(0);
-						case 6:
-						case 7:
-							do {
-								vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-								vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn >> 4) & 0x000f));
-								vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn >> 8) & 0x000f));
-								rv = new scalar16_insn("st", "r{d}, (r{s}+{u}*4)");
-								rv->addParameter("d", d)->addParameter("s", s)->addParameter("u", u);
-							} while(0);
-						default:
-							rv = new scalar16_insn("*unknown*", "{name}");
-						}
-					}
-				} while(0);
-			}
-			return rv;
-		}
+#define D(n) scalar16_insn *n(uint16_t insn)
+#define RV(n) return ((scalar16_insn *)(n))
+
+		D(loadStoreRange) {
+			std::string opname((((insn >> 6) & 1) == 1)?"stm":"ldm");
+			std::string spdir((((insn >> 6) & 1) == 1)?"--sp":"sp++");
+			uint32_t rb = which_b_reg(insn);
+			uint32_t rm = (insn & 0x000f);
+			RV(NI(opname, "r{b}-r{m}, ({d})")->addParameter("b", PR(rb))
+				 ->addParameter("m", PR(rm))->addParameter("d", PD(spdir)));
+	}
+
+	D(loadStoreSPOffset) {
+		std::string opname((((insn >> 9) & 1) == 1)?"st":"ld");
+		std::string spd("sp");
+		int32_t offs = ((insn >> 4) & 0x001f) * 4;
+		uint32_t rd = insn & 0x000f;
+
+		if (offs < 0) {
+			spd += "-";
+			offs *= -1;
+		}	else spd += "+";
+
+		RV(NI(opname, "r{d}, ({s}{o})")->addParameter("d", PR(rd))
+			 ->addParameter("s", PD(spd))->addParameter("o", PO(offs)));
+	}
+
+	D(loadStoreWidth) {
+		std::string opname((((insn >> 8) & 1) == 1)?"st":"ld");
+		opname += mem_op_widths[(insn >> 9) & 3];
+		uint32_t rd = insn & 0x000f;
+		uint32_t rs = (insn >> 4) & 0x000f;
+		RV(NI(opname, "r{d}, (r{s})")->addParameter("d", PR(rd))
+			 ->addParameter("s", PR(rs)));
+	}
+
+	D(addSPOffset) {
+		uint32_t rd = insn & 0x001f;
+		int32_t offs = (insn >> 5) & 0x001f;
+		offs *= 4;
+
+		RV(NI("add", "r{d}, sp, {o}")->addParameter("d", PR(rd))
+			 ->addParameter("o", PO(offs)));
+	}
+
+	D(branchWithCondition) {
+		std::string opname("b");
+		opname += condition_codes[(insn >> 7) & 7];
+		int32_t offs = insn & 0x007f;
+		offs *= 2;
+		RV(NI(opname, "{o}")->addParameter("o", PO(offs)));
+	}
+
+	D(loadStoreRegisterOffset) {
+		std::string opname((((insn >> 12) & 1) == 1)?"st":"ld");
+		uint32_t rd = insn & 0x000f;
+		uint32_t rs = (insn & 0x00f0) >> 4;
+		uint32_t u = ((insn & 0x0f00) >> 8) * 4;
+		RV(NI(opname, "r{d}, (r{s}+{u})")->addParameter("d", PR(rd))
+														 ->addParameter("s", PR(rs))->addParameter("u", P_I(u)));
+	}
+
+	scalar16_insn *getMemoryOperation(uint16_t insn) {
+		uint8_t c = (insn >> 7) & 0x007f;  // seven bits tells which op, overall
+
+		if( c & 0x0100 ) return loadStoreRegisterOffset(insn);
+		else if( ((c & 0x0030) >> 4) == 3 ) return branchWithCondition(insn);
+		else if( c & 64 ) return addSPOffset(insn);
+		else if( c & 16 ) return loadStoreWidth(insn);
+		else if( c & 8 ) return loadStoreSPOffset(insn);
+		else if ( c & 4 ) return loadStoreRange(insn);
+		else return new scalar16_insn("*unknown scalar16 memory*", "");
+	}
+
 
 #define FOUR_BIT(x) (al_ops[((x)&0x000f) << 1])
 #define FIVE_BIT(x) (al_ops[((x)&0x001f)])
 
-		scalar16_insn *getALRR(uint16_t insn) {
+		D(getArithOrLogicalRegisterRegister) {
 			uint8_t dc = ((insn & 0x1f00) >> 8);
-			string fmt("r{d}, r{s}");
-			string add;
+			uint32_t rd = insn & 0x000f;
+			uint32_t rs = (insn >> 4) & 0x000f;
+			std::string fmt("r{d}, r{s}");
+			std::string add;
 			if( dc == 19 ) add = " << 1";
 			else if( dc > 20 && dc < 24 ) add = string(" << ") + std::to_string(dc - 19);
 			if (add.length() > 0) fmt += add;
-			scalar16_insn *rv = new scalar16_insn(FIVE_BIT((insn & 0x1F00) >> 8), fmt);
 
-			vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-			vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)((insn & 0x00f0) >> 4));
-			rv->addParameter("d", d)->addParameter("s", s);
-			return rv;
+			RV(NI(FIVE_BIT((insn & 0x1f00) >> 8), fmt)
+				 ->addParameter("d", PR(rd))->addParameter("s", PR(rs)));
 		}
 
-		scalar16_insn *getALRI(uint16_t insn) {
-			uint8_t dc = (insn & 0x1e00) >> 9;
-			scalar16_insn *rv = new scalar16_insn(FOUR_BIT(dc), dc==3?"r{d}, {u} << 3":"r{d}, {u}");
-			vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x000f));
-			vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x1f0) >> 4));
-			rv->addParameter("d", d)->addParameter("u", u);
-			return rv;
+		D(getArithOrLogicalRegisterImmediate) {
+			std::string fmt((((insn & 0x1e00) >> 9) == 3)?"r{d}, {u} << 3":"r{d}, {u}");
+			uint32_t rd = insn & 0x000f;
+			uint32_t u = (insn >> 4) & 0x001f;
+			RV(NI(FOUR_BIT((insn & 0x1e00) >> 9), fmt)
+				 ->addParameter("d", PR(rd))
+				 ->addParameter("u", P_I(u)));
 		}
+
 #undef FOUR_BIT
 #undef FIVE_BIT
+#undef RV
+#undef D
+#undef NI
+#undef PD
+#undef P_I
+#undef PR
+#undef PO
+#undef P
 
 		scalar16_insn *getArithLogical(uint16_t insn) {
-			return ((insn&0x6000) == 0x6000)?getALRI(insn):getALRR(insn);
-		}
-
-		scalar16_insn *getAddOrBranch(uint16_t insn) {
-			scalar16_insn *rv;
-
-			if (insn & 0x0800) {
-				uint8_t cc_r = (insn & 0x0780) >> 7;
-				string cc(condition_codes[cc_r]);
-				rv = new scalar16_insn(string("b")+cc, "$+({o}*2)");
-				rv->addParameter("o", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)(insn & 0x007f)));
-			} else {
-				vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)(insn & 0x001f));
-				vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((insn & 0x03f0) >> 5));
-				rv = new scalar16_insn("add", "r{d}, sp, ({o}*4)");
-				rv->addParameter("d", d)->addParameter("o", o);
-			}
-
-			return rv;
+			return ((insn&0x6000) == 0x6000)?
+				getArithOrLogicalRegisterImmediate(insn):
+				getArithOrLogicalRegisterRegister(insn);
 		}
 
 		scalar16_insn *getInstruction(uint8_t *buffer) {
@@ -220,7 +180,6 @@ namespace disasm {
 			// certain bit-patterns
 			uint16_t insn_raw = READ_WORD(buffer);//(uint16_t)(*((uint16_t *)buffer));
 			if ( (insn_raw & 0xFF00) == 0 ) return getSimpleInsn(insn_raw);
-			else if ( (insn_raw & 0x1000) && !(insn_raw & 0x4000) ) return getAddOrBranch(insn_raw);
 			else if ( (insn_raw & 0x4000) == 0 ) return getMemoryOperation(insn_raw);
 			else return getArithLogical(insn_raw);
 		}

@@ -53,8 +53,14 @@ namespace disasm {
 					case ParameterTypes::IMMEDIATE:
 						if (p.getContainedType() == "f")
 							rval = std::to_string(p.value<float>());
-						else
-							rval = (boost::format { "0x%08X" } % p.value<uint32_t>()).str();
+						else {
+							uint32_t val = p.value<uint32_t>();
+							if (val < 0x00010000) rval = std::to_string(val);
+							else rval = (boost::format { "0x%08X" } % p.value<uint32_t>()).str();
+						}
+						break;
+					case ParameterTypes::OFFSET:
+						rval = std::to_string(p.value<int32_t>());
 						break;
 					case ParameterTypes::VECTOR_REGISTER:
 					case ParameterTypes::DATA:
