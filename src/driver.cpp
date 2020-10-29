@@ -109,11 +109,6 @@ int main(int argc, char *argv[]) {
 			ssz = 10;
 		}
 
-		if (ssz != ci->getSizeBytes() && ci != NULL)
-			std::cerr << "moving ahead " << std::to_string(ssz) << " bytes, instruction claimed to be " << std::to_string(ci->getSizeBytes()) << " -- possible error decoding and incorrect instructions follow" << std::endl;
-		else if (ci == NULL)
-			std::cerr << "instruction is null!" << std::endl;
-		
 		work += ssz;
 	}
 

@@ -3,114 +3,109 @@
 #include <vc4_data.hpp>
 #include <vc4_parameter.hpp>
 
-using namespace std;
-
+#define INSTRUCTION_TYPE scalar48_insn
+#define INSTRUCTION_STORAGE s48d
 namespace disasm {
+	struct s48d {
+		uint16_t insn;
+		uint32_t arg;
+
+		s48d(uint8_t *b) {
+			insn = READ_WORD(b);
+			arg = READ_DWORD_X(b+2);
+		}
+	};
+
 	namespace scalar48 {
-		scalar48_insn *get_simple(uint8_t chk, uint32_t insn, uint32_t param) {
-			scalar48_insn *rv;
-			vc4_parameter pp(ParameterTypes::IMMEDIATE, (uint32_t)(param));
-			if (chk == 0) {
-				string lops[][3] = { {"j", "{u}", "u" }, {"b", "$+{o}", "o" },
-														 {"jl", "{u}", "u"}, {"bl", "$+{o}", "o"} };
-				uint8_t ops = ((insn >> 8) | 0xfffc) & 0x0003;
-				rv = new scalar48_insn(lops[ops][0], lops[ops][1]);
-				rv->addParameter(lops[ops][2], pp);
-				return rv;
-			} else {
-				string opname;
-				string w;
-				switch(((insn >> 8) | 0xfff8) & 0x0007) {
-				case 5:
-					do {
-						// this is the simplest of the complex "simples"
-						vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
-						rv = new scalar48_insn("add", "r{d}, pc, {o}");
-						rv->addParameter("d", d)->addParameter("o", pp);
-						return rv;
-					} while(0);
-				case 6:
-					do {
-						// this is a load-store with register-relative
-						// addressing and a limited width on the parameter
-						// as it steals some bits to encode the source
-						// and destination
-						vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
-						vc4_parameter s(ParameterTypes::REGISTER, (uint32_t)(((param >> 27) | 0xffffffe0) & 0x0000001f));
-						vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((param | 0xe0000000) & 0x1fffffff));
-						string w(mem_op_widths[((insn >> 6) | 0xfffffffc) & 3]);
-						uint8_t b = ((insn >> 5) | 0xfffffffe) & 0x00000001;
-						string opc(b?"st":"ld");
-						opc += w;
-						rv = new scalar48_insn(opc, "r{d}, (r{s}+{o})");
-						rv->addParameter("d", d)->addParameter("s", s)
-							->addParameter("o", o);
-						return rv;
-					} while(0);
-				case 7:
-					do {
-						vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
-						vc4_parameter o(ParameterTypes::IMMEDIATE, (uint32_t)((param | 0xe0000000) & 0x1fffffff));
-						string w(mem_op_widths[((insn >> 6) | 0xfffffffc) & 3]);
-						uint8_t b = ((insn >> 5) | 0xfffffffe) & 0x00000001;
-						string opc(b?"st":"ld");
-						opc += w;
-						rv = new scalar48_insn(opc, "r{d}, (pc+{o})");
-						rv->addParameter("d", d)->addParameter("o", o);
-						return rv;
-					} while(0);
-				default:
-					assert("Code that should never run!");
-					return NULL;
-				}
+		D(simpleBranch) {
+			int32_t offs = insn.arg;
+			std::string op(((insn.insn >> 9) & 3)?"bl":"b");
+			std::string s("+");
+			if (offs < 0) {
+				s = "-";
+				offs *= -1;
 			}
-			assert("This code should never run!");
-			return NULL;
+
+			RV(NI(op, "$[[${s}{t}]]")
+				 ->addParameter("t", P_I(offs))->addParameter("s", PD(s)));
 		}
 
-		scalar48_insn *get_oper(uint32_t insn, uint32_t param) {
-			vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)(param));
-			vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
-			uint8_t oper = ((insn >> 5) | 0xffe0) & 0x001f;
-			string opcode(al_ops[oper]);
-
-			scalar48_insn *rv = new scalar48_insn(opcode, "r{d}, {u}");
-			rv->addParameter("d", d)->addParameter("u", u);
-			return rv;
+		D(simpleJump) {
+			std::string op(((insn.insn >> 8) & 1)?"jl":"j");
+			RV(NI(op, "{o}")->addParameter("o", P_I(insn.arg)));
 		}
+
+		D(pcRelAdd) {
+			RV(NI("add", "r{d}, pc, {o}")
+				 ->addParameter("d", PR((insn.insn & 0x1f)))
+				 ->addParameter("o", P_I(insn.arg)));
+		}
+
+		D(loadStoreRel) {
+			uint32_t arg = (insn.arg & 0x07ffffff);
+			uint32_t rd = (insn.insn & 0x1f);
+			uint32_t rs = ((insn.arg >> 27) & 0x1f);
+			std::string op(((insn.insn >> 5)&1)?"st":"ld");
+			op += mem_op_widths[((insn.insn >> 6) & 3)];
+			RV(NI(op, "r{d}, (r{s} + {o})")
+				 ->addParameter("d", PR(rd))->addParameter("s", PR(rs))
+				 ->addParameter("o", P_I(arg)));
+		}
+
+		D(loadStorePCRel) {
+			uint32_t arg = (insn.arg & 0x07ffffff);
+			uint32_t rd = (insn.insn & 0x1f);
+			std::string op(((insn.insn >> 5)&1)?"st":"ld");
+			op += mem_op_widths[((insn.insn >> 6) & 3)];
+			RV(NI(op, "r{d}, (pc + {o})")
+				 ->addParameter("d", PR(rd))->addParameter("o", P_I(arg)));
+		}
+
+		D(simpleDispatch) {
+			switch((insn.insn >> 8) & 0xf) {
+			case 0:
+			case 2:
+				return simpleBranch(insn);
+			case 1:
+			case 3:
+				return simpleJump(insn);
+			case 4:
+				RV(NI("*unknown scalar48 simple*", ""));
+			case 5:
+				return pcRelAdd(insn);
+			case 6:
+				return loadStoreRel(insn);
+			case 7:
+				return loadStorePCRel(insn);
+			default:
+				RV(NI("*unknown scalar48 simple*", ""));
+			}
+		}
+
+		D(aluRegImm) {
+			uint32_t rd = (insn.insn & 0x1f);
+			std::string op(al_ops[((insn.insn >> 5) & 0x1f)]);
+			RV(NI(op, "r{d}, {u}")->addParameter("d", PR(rd))
+				 ->addParameter("u", P_I(insn.arg)));
+		}
+
+		D(aluRegRegImm) {
+			uint32_t rd = (insn.insn & 0x1f);
+			uint32_t rs = ((insn.insn >> 5) & 0x1f);
+			RV(NI("add", "r{d}, r{s}, {u}")->addParameter("d", PR(rd))
+				 ->addParameter("u", P_I(insn.arg))
+				 ->addParameter("s", PR(rs)));
+		}
+
+		D(dispatchALU) {
+			return ((insn.insn >> 10)&1)?aluRegRegImm(insn):aluRegImm(insn);
+		}
+
 
 		scalar48_insn *getInstruction(uint8_t *buffer) {
-			// SCALAR48 is a little-endian 16 bit word followed by
-			// a little-endian 32-bit word and not a series of 16 bit
-			// little endian words
-			uint16_t insn = READ_WORD(buffer);
-			uint32_t insn_arg = READ_DWORD_X(buffer+2);
+			s48d i(buffer);
 
-			uint32_t check = (insn >> 10) & 0x000003;
-			switch (check) {
-			case 0:
-			case 1:
-				return get_simple(check, insn, insn_arg);
-			case 2:
-				return get_oper(insn, insn_arg);
-			case 3:
-				do {
-					vc4_parameter d(ParameterTypes::REGISTER, (uint32_t)((insn | 0xffe0) & 0x001f));
-					vc4_parameter s(ParameterTypes::REGISTER,
-													(uint32_t)(((insn >> 5) | 0xffe0) & 0x001f));
-					vc4_parameter u(ParameterTypes::IMMEDIATE, (uint32_t)(insn_arg));
-					scalar48_insn *rv = new scalar48_insn("add", "r{d}, " \
-																								"r{s}, {u}");
-					rv->addParameter("d", d)->addParameter("s", s)
-						->addParameter("u", u);
-					return rv;
-				} while(0);
-			default:
-				assert("This code should never run!");
-				return NULL;
-			}
-			assert("This code should never run!");
-			return NULL;
+			return (((i.insn >> 11) & 1)==1)?dispatchALU(i):simpleDispatch(i);
 		}
 	}
 }
