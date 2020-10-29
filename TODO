@@ -1,5 +1,9 @@
-Cleanup of SCALAR instruction decoding to match the recent refactoring of the VECTOR side
-Implement signed offset ParameterTypes (ParameterTypes::OFFSET  ?) and a way to force the system to apply some math
-  -- ParameterTypes::NEEDS_CALC maybe ?
-	-- post-parse of the output string ?
-Decide on project license
+1) Decide on project license
+  -- MIT or BSD 3-clause
+	-- MIT is simpler
+	-- BSD 3-clause includes source/creator indemnification
+2) Add tracking of current instructions address for PC-relative encodings
+3) Add tracking instruction source bytes to the instructions (this is done by GNU's objdump and is a decent tool for helping find bugs)
+4) Refactor to factory pattern on instruction decoders
+5) Rework driver code to generic consumer-producer
+
