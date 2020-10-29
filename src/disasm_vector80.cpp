@@ -6,6 +6,9 @@
 
 using namespace std;
 
+#define INSTRUCTION_TYPE vector80_insn
+#define INSTRUCTION_STORAGE v80_dmap
+
 namespace disasm {
 	namespace vector80 {
 		enum V80_FLAGS {
@@ -41,13 +44,8 @@ namespace disasm {
 			string width;
 			string flags_s;
 
-			v80_shared() {
-				Ra_x = opcode = 0;
-				d = a = b = reps = ifz = setf = width = string("");
-			}
-
+			v80_shared(v80_dmap insn, uint8_t flags) {
 #define CHECKFLAG(f, F) ((F)==BASE?true:!!(((f) & (1 << (F)))))
-			void load(v80_dmap insn, uint8_t flags) {
 				// the instruction repeat count is always the first 3 bits of insn.first
 				reps = string(vector_reps[insn.first & 7]);
 
@@ -75,15 +73,15 @@ namespace disasm {
 				// if the instruction opens with the first byte having the top 6 bits set
 				// we're in an ALU op and the instruction is a full 6 bits with the size
 				// being flatly 16 or 32 bits depending on bit 2 of the top byte.
-				uint8_t op_base;
 				if (CHECKFLAG(insn.first, 10)) {
-					op_base = ((insn.first >> 3) & 0x3f);
+					opcode = ((insn.first >> 3) & 0x3f);
 					width = string((((insn.first >> 9) & 1) == 1)?"32":"16");
 				} else {
-					op_base = ((insn.first >> 5) & 0x1f);
-					width = vector_widths[((insn.first) >> 3) & 3];
+					opcode = ((insn.first >> 5) & 0x1f);
+					width = string(vector_widths[((insn.first) >> 3) & 3]);
 				}
 
+				if (width.empty() || width.length() == 0) width = string("-err-");
 				// regardless, if we have `HASD` set in our input flags, we can
 				// find it in a fixed location.
 				if (CHECKFLAG(flags, V80_FLAGS::HASD))
@@ -103,40 +101,13 @@ namespace disasm {
 			return rr==15?string(""):(string("+r")+std::to_string(rr));
 		}
 
-		vector80_insn *v80rni(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, ((uint8_t)(1 << V80_FLAGS::HASD)));
-
-			string opname("v");
-			opname += cmn->width + vector_ops_48[cmn->opcode];
-
-			// now get the stuff somewhat specific to this encoding
-			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
-			uint32_t offset = ((((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3));
-			offset *= 128;
-			offset |= (insn.mid & 0x7f);
-			uint32_t o_r = ((insn.end >> 2) & 0xf);
-
-			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
-			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
-			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
-			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
-				->addParameter("o", off)->addParameter("F", flags);
-
-			return rv;
-		}
-
 #define F(S) (1 << S)
 
-		vector80_insn *v80nri(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA));
+		D(v80rni) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASD));
 
 			string opname("v");
-			opname += cmn->width + vector_ops_48[cmn->opcode];
+			opname += std::string(cmn.width) + std::string(vector_ops_48[cmn.opcode]);
 
 			// now get the stuff somewhat specific to this encoding
 			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
@@ -145,16 +116,30 @@ namespace disasm {
 			offset |= (insn.mid & 0x7f);
 			uint32_t o_r = ((insn.end >> 2) & 0xf);
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{da}, (r{r}+{o}) {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RDA(ParameterTypes::DATA, rd_add);
-			vc4_parameter rs(ParameterTypes::REGISTER, (uint32_t)o_r);
-			vc4_parameter off(ParameterTypes::IMMEDIATE, (uint32_t)offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
-			rv->addParameter("D", D)->addParameter("da", RDA)->addParameter("r", rs)
-				->addParameter("o", off)->addParameter("F", flags);
+			RV(NI(opname, "{D}{da}, (r{r}+{o}) {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("da", PD(rd_add))
+				 ->addParameter("rs", PR(o_r))->addParameter("o", P_I(offset))
+				 ->addParameter("F", PD(cmn.flags_s)));
+		}
 
-			return rv;
+		D(v80nri) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASA));
+
+			string opname("v");
+			opname += cmn.width + vector_ops_48[cmn.opcode];
+
+			// now get the stuff somewhat specific to this encoding
+			string rd_add(make_reg_add((insn.trail >> 12) & 0xf));
+			uint32_t offset = ((((insn.end >> 6) & 0x3f) << 2) | (insn.end & 3));
+			offset *= 128;
+			offset |= (insn.mid & 0x7f);
+			uint32_t o_r = ((insn.end >> 2) & 0xf);
+
+
+			RV(NI(opname, "{D}{da}, (r{r}+{o}) {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("da", PD(rd_add))
+				 ->addParameter("rs", PR(o_r))->addParameter("o", P_I(offset))
+				 ->addParameter("F", PD(cmn.flags_s)));
 		}
 
 		std::string* getRegAdds(v80_dmap insn) {
@@ -162,42 +147,31 @@ namespace disasm {
 			rv[0] = make_reg_add((insn.trail >> 12) & 0xf);
 			rv[1] = make_reg_add((insn.trail >> 6) & 0xf);
 			rv[2] = make_reg_add((insn.end >> 2) & 0xf);
-			
+
 			return rv;
 		}
 
-		vector80_insn *v80rrr(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+		D(v80rrr) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 
 			string opname("v");
-			opname += cmn->width + vector_ops_48[cmn->opcode];
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
 			string* adds = getRegAdds(insn);
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
-			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, string(cmn->b));
-			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
 
-			rv->addParameter("D", D)->addParameter("rd", RD)
-				->addParameter("A", A)->addParameter("ra", RA)
-				->addParameter("B", B)->addParameter("rb", RB)
-				->addParameter("F", flags);
-
-			return rv;
+			RV(NI(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("rd", PD(adds[0]))
+				 ->addParameter("A", PV(cmn.a))->addParameter("ra", PD(adds[1]))
+				 ->addParameter("B", PV(cmn.b))->addParameter("rb", PD(adds[2]))
+				 ->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector80_insn *v80rri(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
+		D(v80rri) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
 
 			string opname("v");
-			opname += cmn->width + vector_ops_48[cmn->opcode];
+			opname += cmn.width + vector_ops_48[cmn.opcode];
 
 			string rd_add(make_reg_add((insn.trail >> 6) & 0xf));
 			string ra_add(make_reg_add((insn.end >> 2) & 0xf));
@@ -206,60 +180,39 @@ namespace disasm {
 			uint32_t l = (insn.mid & 0x3ff);
 			uint32_t offset = ((j << 10) | l);
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {imm} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RD(ParameterTypes::DATA, rd_add);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
-			vc4_parameter RA(ParameterTypes::DATA, ra_add);
-			vc4_parameter IMM(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
-
-			rv->addParameter("D", D)->addParameter("rd", RD)
-				->addParameter("A", A)->addParameter("ra", RA)
-				->addParameter("imm", IMM)->addParameter("F", flags);
-
-			return rv;
+			RV(NI(opname, "{D}{rd}, {A}{ra}, {imm} {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("rd", PD(rd_add))
+				 ->addParameter("A", PV(cmn.a))->addParameter("ra", PD(ra_add))
+				 ->addParameter("imm", P_I(offset))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-    vector80_insn *vector80memory(v80_dmap insn) {
+    D(vector80memory) {
 			bool remove_reg = (((insn.mid >> 7) & 7) == 7);
 			if ( ((insn.mid >> 18) & 0x0e) == 0x0e && remove_reg) return v80rni(insn);
 			else if( ((insn.mid >> 28) & 0x0e) == 0x0e && remove_reg) return v80nri(insn);
 			else if( !remove_reg && ((insn.mid >> 10) & 1) == 0 ) return v80rrr(insn);
 			else if( !remove_reg && ((insn.mid >> 10) & 1) == 1 ) return v80rri(insn);
-			return new vector80_insn("!!!ERROR!!!", "");
+			return new vector80_insn("*unknown vector80", "");
 		}
 
-		vector80_insn *v80arrr(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
+		D(v80arrr) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASB)|F(V80_FLAGS::HASD));
 			string opname("v");
-			opname += cmn->width + vector_ops_full[cmn->opcode];
+			opname += cmn.width + vector_ops_full[cmn.opcode];
 
 			string* adds = getRegAdds(insn);
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
-			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
-			vc4_parameter B(ParameterTypes::VECTOR_REGISTER, string(cmn->b));
-			vc4_parameter RB(ParameterTypes::DATA, adds[2]);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
-
-			rv->addParameter("D", D)->addParameter("rd", RD)
-				->addParameter("A", A)->addParameter("ra", RA)
-				->addParameter("B", B)->addParameter("rb", RB)
-				->addParameter("F", flags);
-
-			return rv;
+			RV(NI(opname, "{D}{rd}, {A}{ra}, {B}{rb} {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("rd", PD(adds[0]))
+				 ->addParameter("A", PV(cmn.a))->addParameter("ra", PD(adds[1]))
+				 ->addParameter("B", PV(cmn.b))->addParameter("rb", PD(adds[2]))
+				 ->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector80_insn *v80arri(v80_dmap insn) {
-			v80_shared *cmn = new v80_shared();
-			cmn->load(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
+		D(v80arri) {
+			v80_shared cmn(insn, (uint8_t)F(V80_FLAGS::HASA)|F(V80_FLAGS::HASD));
 			string opname("v");
-			opname += cmn->width + vector_ops_full[cmn->opcode];
+			opname += cmn.width + vector_ops_full[cmn.opcode];
 
 			string* adds = getRegAdds(insn);
 
@@ -267,22 +220,13 @@ namespace disasm {
 			uint32_t off_base = insn.end & 0x3f;
 			uint32_t offset = (off_base << 10) | off_add;
 
-			vector80_insn *rv = new vector80_insn(opname, "{D}{rd}, {A}{ra}, {i} {F}");
-			vc4_parameter D(ParameterTypes::VECTOR_REGISTER, string(cmn->d));
-			vc4_parameter RD(ParameterTypes::DATA, adds[0]);
-			vc4_parameter A(ParameterTypes::VECTOR_REGISTER, string(cmn->a));
-			vc4_parameter RA(ParameterTypes::DATA, adds[1]);
-			vc4_parameter I(ParameterTypes::IMMEDIATE, offset);
-			vc4_parameter flags(ParameterTypes::DATA, cmn->flags_s);
-
-			rv->addParameter("D", D)->addParameter("rd", RD)
-				->addParameter("A", A)->addParameter("ra", RA)
-				->addParameter("i", I)->addParameter("F", flags);
-
-			return rv;
+			RV(NI(opname, "{D}{rd}, {A}{ra}, {imm} {F}")
+				 ->addParameter("D", PV(cmn.d))->addParameter("rd", PD(adds[0]))
+				 ->addParameter("A", PV(cmn.a))->addParameter("ra", PD(adds[1]))
+				 ->addParameter("imm", P_I(offset))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector80_insn *vector80alu(v80_dmap insn) {
+		D(vector80alu) {
 			bool check = (((insn.mid >> 10) & 1) == 1);
 
 			if( !check ) return v80arrr(insn);
@@ -294,9 +238,6 @@ namespace disasm {
 
 			if ( (insn.first >> 10) & 1 ) return vector80alu(insn);
 			else return vector80memory(insn);
-
-			assert(true && "This should never be hit!");
-			return NULL;
 		}
 	}
 }

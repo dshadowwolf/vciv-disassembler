@@ -38,3 +38,15 @@
 #define IS_VECTOR80(x) ((x) == 0x1f)
 #define IS_VECTOR48(x) ((x) == 0x1e)
 #define IS_SCALAR32(x) (!IS_SCALAR48(x) && !IS_VECTOR48(x) && !IS_VECTOR80(x) && !IS_SCALAR16(x))
+
+#define P(x, y) vc4_parameter((x), (y))
+#define PR(y) P(ParameterTypes::REGISTER, (uint32_t)(y))
+#define PO(y) P(ParameterTypes::OFFSET, (int32_t)(y))
+#define P_I(y) P(ParameterTypes::IMMEDIATE, (uint32_t)(y))
+#define PD(y) P(ParameterTypes::DATA, (y))
+#define PV(y) P(ParameterTypes::VECTOR_REGISTER, (y))
+#define NI(n, f) (new INSTRUCTION_TYPE((n), (f)))
+
+#define D(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn)
+#define RV(n) return ((INSTRUCTION_TYPE *)(n))
+#define DZ(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn, std::string opname)

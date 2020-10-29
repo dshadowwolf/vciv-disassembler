@@ -103,12 +103,17 @@ int main(int argc, char *argv[]) {
 		else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
 		if (ci != NULL) {
-			ssz = (ci->getReadable()=="*unknown*")?2:ci->getSizeBytes();
+			ssz = ((ci->getReadable().find("unknown")>0)?2:ci->getSizeBytes());
 			instructions.push_back(*ci);
 		} else {
 			ssz = 10;
 		}
 
+		if (ssz != ci->getSizeBytes() && ci != NULL)
+			std::cerr << "moving ahead " << std::to_string(ssz) << " bytes, instruction claimed to be " << std::to_string(ci->getSizeBytes()) << " -- possible error decoding and incorrect instructions follow" << std::endl;
+		else if (ci == NULL)
+			std::cerr << "instruction is null!" << std::endl;
+		
 		work += ssz;
 	}
 
@@ -117,6 +122,6 @@ int main(int argc, char *argv[]) {
 		disasm::vc4_insn curr = *it;
 
 		std::cout << (boost::format { "0x%08X" } % addr ).str() << "\t" << curr.toString() << std::endl;
-		addr += (curr.getReadable()=="*unknown*")?2:curr.getSizeBytes();
+		addr += ((curr.getReadable().find("unknown")>0)?2:curr.getSizeBytes());
 	}
 }

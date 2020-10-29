@@ -5,6 +5,9 @@
 
 using namespace std;
 
+#define INSTRUCTION_TYPE vector48_insn
+#define INSTRUCTION_STORAGE uint64_t
+
 namespace disasm {
 	namespace vector48 {
 		enum v48flags {
@@ -106,85 +109,62 @@ namespace disasm {
 			return rv;
 		}
 
-		vector48_insn *vector48mrro(uint64_t insn) {
+		D(vector48mrro) {
 			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::ISMEM);
 			std::string fmt(make_format(cmn, 1));
-			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("rb", vc4_parameter(ParameterTypes::REGISTER, (uint32_t)cmn.rb))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("rb", PR(cmn.rb))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector48_insn *vector48mrrr(uint64_t insn) {
+		D(vector48mrrr) {
 			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::HASB|v48flags::ISMEM);
 			std::string fmt(make_format(cmn, 2));
-			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("B", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.b))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, string("")));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("B", PV(cmn.b))->addParameter("F", PD(string(""))));
 		}
 
-		vector48_insn *vector48mrri(uint64_t insn) {
+		D(vector48mrri) {
 			v48_shared cmn(insn, v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::IFZ|v48flags::IMM|v48flags::ISMEM);
 			std::string fmt(make_format(cmn, 3));
-			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("imm", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)cmn.imm))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("imm", P_I(cmn.imm))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector48_insn *vector48drro(uint64_t insn) {
+		D(vector48drro) {
 			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::SETF);
 			std::string fmt(make_format(cmn, 1));
-			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("rb", vc4_parameter(ParameterTypes::REGISTER, (uint32_t)cmn.rb))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("rb", PR(cmn.rb))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector48_insn *vector48drrr(uint64_t insn) {
+		D(vector48drrr) {
 			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::HASB);
 			std::string fmt(make_format(cmn, 2));
 			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("B", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.b))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, string("")));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("B", PV(cmn.b))->addParameter("F", PD(string(""))));
 		}
 
-		vector48_insn *vector48drri(uint64_t insn) {
+		D(vector48drri) {
 			v48_shared cmn(insn, v48flags::SIXBIT|v48flags::HASD|v48flags::HASA|v48flags::SETF|v48flags::IFZ|v48flags::IMM);
 			std::string fmt(make_format(cmn, 3));
-			vector48_insn * rv = new vector48_insn(cmn.operation, fmt);
-			rv->addParameter("D", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.d))
-				->addParameter("d", vc4_parameter(ParameterTypes::DATA, cmn.rs))
-				->addParameter("A", vc4_parameter(ParameterTypes::VECTOR_REGISTER, cmn.a))
-				->addParameter("imm", vc4_parameter(ParameterTypes::IMMEDIATE, (uint32_t)cmn.imm))
-				->addParameter("F", vc4_parameter(ParameterTypes::DATA, cmn.flags_s));
-			return rv;
+			RV(NI(cmn.operation, fmt)->addParameter("D", PV(cmn.d))
+				 ->addParameter("d", PD(cmn.rs))->addParameter("A", PV(cmn.a))
+				 ->addParameter("imm", P_I(cmn.imm))->addParameter("F", PD(cmn.flags_s)));
 		}
 
-		vector48_insn *v48m_dispatch(uint64_t insn) {
+		D(v48m_dispatch) {
 			if (((insn >> 7) & 7) == 7) return vector48mrro(insn);
 			else if (((insn >> 10) & 1) == 0) return vector48mrrr(insn);
 			else return vector48mrri(insn);
 		}
 
-		vector48_insn *v48d_dispatch(uint64_t insn) {
+		D(v48d_dispatch) {
 			if (((insn >> 7) & 7) == 7) return vector48drro(insn);
 			else if (((insn >> 10) & 1) == 0) return vector48drrr(insn);
 			else return vector48drri(insn);
@@ -196,7 +176,6 @@ namespace disasm {
 			insn |= READ_WORD(buffer+2);
 			insn <<= 16;
 			insn |= READ_WORD(buffer+4);
-			//insn &= 0x0000ffffff;
 			if ((insn >> 42) & 1) return v48d_dispatch(insn);
 			else return v48m_dispatch(insn);
 		}

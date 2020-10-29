@@ -7,6 +7,9 @@
 
 using namespace std;
 
+#define INSTRUCTION_TYPE scalar16_insn
+#define INSTRUCTION_STORAGE uint16_t
+
 namespace disasm {
 	namespace scalar16 {
 		scalar16_insn *getSimpleInsn(uint16_t insn) {
@@ -49,22 +52,13 @@ namespace disasm {
 			return bb==0?0:(bb==1?6:(bb==2?16:24));
 		}
 
-#define P(x, y) vc4_parameter((x), (y))
-#define PR(y) P(ParameterTypes::REGISTER, (y))
-#define PO(y) P(ParameterTypes::OFFSET, (y))
-#define P_I(y) P(ParameterTypes::IMMEDIATE, (y))
-#define PD(y) P(ParameterTypes::DATA, (y))
-#define NI(n, f) (new scalar16_insn((n), (f)))
-
-#define D(n) scalar16_insn *n(uint16_t insn)
-#define RV(n) return ((scalar16_insn *)(n))
-
 		D(loadStoreRange) {
 			std::string opname((((insn >> 6) & 1) == 1)?"stm":"ldm");
 			std::string spdir((((insn >> 6) & 1) == 1)?"--sp":"sp++");
 			uint32_t rb = which_b_reg(insn);
 			uint32_t rm = (insn & 0x000f);
-			RV(NI(opname, "r{b}-r{m}, ({d})")->addParameter("b", PR(rb))
+			std::string fmt((rb == rm)?"r{b}, ({d})":"r{b}-r{m}, ({d})");
+			RV(NI(opname, fmt)->addParameter("b", PR(rb))
 				 ->addParameter("m", PR(rm))->addParameter("d", PD(spdir)));
 	}
 
@@ -159,15 +153,7 @@ namespace disasm {
 
 #undef FOUR_BIT
 #undef FIVE_BIT
-#undef RV
-#undef D
-#undef NI
-#undef PD
-#undef P_I
-#undef PR
-#undef PO
-#undef P
-
+		
 		scalar16_insn *getArithLogical(uint16_t insn) {
 			return ((insn&0x6000) == 0x6000)?
 				getArithOrLogicalRegisterImmediate(insn):

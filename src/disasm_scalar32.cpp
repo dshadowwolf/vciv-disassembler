@@ -5,17 +5,8 @@
 
 using namespace std;
 
-
-#define P(x, y) vc4_parameter((x), (y))
-#define PR(y) P(ParameterTypes::REGISTER, (y))
-#define PO(y) P(ParameterTypes::OFFSET, (y))
-#define P_I(y) P(ParameterTypes::IMMEDIATE, (y))
-#define PD(y) P(ParameterTypes::DATA, (y))
-#define NI(n, f) (new scalar32_insn((n), (f)))
-
-#define D(n) scalar32_insn *n(uint32_t insn)
-#define RV(n) return ((scalar32_insn *)(n))
-#define DZ(n) scalar32_insn *n(uint32_t insn, std::string opname)
+#define INSTRUCTION_TYPE scalar32_insn
+#define INSTRUCTION_STORAGE uint32_t
 
 namespace disasm {
 	namespace scalar32 {
@@ -388,6 +379,7 @@ namespace disasm {
 		}
 
 		D(floatDispatchConvert) {
+			if (((insn >> 22) & 1) == 1) return new scalar32_insn("*unknown scalar32 (possible control register access)*", "");
 			switch( ((insn >> 21) & 3) ) {
 			case 0:
 				return floatTrunc(insn);
@@ -414,17 +406,6 @@ namespace disasm {
 
 			RV(NI("mov", fmt)->addParameter("a", PR(reg_dest))->addParameter("d", PR(reg_src)));
 		}
-
-#undef P
-#undef PR
-#undef PO
-#undef P_I
-#undef PD
-#undef NI
-
-#undef D
-#undef RV
-#undef DZ
 
 		scalar32_insn *getInstruction(uint8_t *buffer) {
 			// read the instruction and check the type
