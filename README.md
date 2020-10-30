@@ -21,7 +21,9 @@ The build system has been massively reworked to be based on CMake (3.13 at a min
 While there was some hopes to have this use nothing but standard C++, it was found that a version of Boost was needed - if just for Boost::format (since std::format is a C++20 feature that I do not have a compiler with support for, yet). There are likely to be further tools and libraries relied upon in the future, as the project moves from being several chunks of inter-related code and single-threaded to being something thread-safe and a library that can be relied on to provide instruction decoding handling.
 
 ### Utility Internals
-To some extent there is a major need to refactor the current code into a more coherent and cohesive system. This is planned but not documented, as needs and extended requirements are being found as things progress. At a minimum some internal math system is going to be required for handling some chunks of instruction encodings, such as the SCALAR32 "conditional branch" instructions, which jump to "program memory start plus \"offset*2\"" (in @hermanhermitage's documentation, `b<cc> $+o*2*`).
+At this point there has been some work done to replicate the functionality of Boost::format - whether this is actually needed and a replacement for Boost::format is required at all. (It would be nice for the code-base to not need anything more than the C and C++ standard libraries, but this might be a pipe-dream)
+
+To some extent there is a major need to refactor the current code into a more coherent and cohesive system. This is planned but not documented, as needs and extended requirements are being found as things progress.
 
 More than that a full refactor to replace the "magic number" bit-masks and shifts into constants, along with a portable replacement for the current instruction-stream read and decode into proper input for instructions is necessary.
 
@@ -29,8 +31,7 @@ Lastly the current system is a few small classes and a "big mess of methods in s
 
 ## Future Plans
 ### Immediate Plans
-Moving the decoders to a factory pattern with class (non-instance) methods and 
-Extension of the decoders so they store the bytes (as they appear in the instruction stream) that the instructions are composed of in the actual returned instruction. Alongside this will be some work to allow for those parameters that are signed to be handled internally as such (currently all integers, regardless of whether or not the VC-IV core would treat the value as signed, are treated as unsigned in the code). The latter change, specifically, is needed for places where the branch instruction actually encodes an PC relative offset, but decodes such into a direct address.
+Moving the decoders to a factory pattern with class (non-instance) methods and addressing any bugs found as an attempt is made to write a clone of this code in Rust. On top of this are so preliminary plans for rewriting a chunk of the internals so that the decoders can be extended with a language such as Python.
 
 ### Near Future
 Conversion and testing for thread safety and re-entrancy concerns leading towards reworking the code into a support library, some testing binaries and a console application/utility that provides as much of the libraries functionality as possible without requiring people to write new code to use it.
