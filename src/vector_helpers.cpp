@@ -27,7 +27,7 @@ namespace disasm {
 
 			if (xy == 12 || xy == 13) rv += "Y";
 			else if (xy >= 8 && xy <= 11) rv += "X";
-			else if (xy == 14) return string("DISCARD-IGNORE");
+			else if (xy == 14) return string( "-" );
 			rv += "(";
 			rv += std::to_string(y);
 			rv += ", ";

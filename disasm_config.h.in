@@ -47,6 +47,7 @@
 #define PV(y) P(ParameterTypes::VECTOR_REGISTER, (y))
 #define NI(n, f) (new INSTRUCTION_TYPE((n), (f)))
 
-#define D(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn)
+#define D(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn, uint32_t src_addr)
 #define RV(n) return ((INSTRUCTION_TYPE *)(n))
-#define DZ(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn, std::string opname)
+#define DZ(n) INSTRUCTION_TYPE *n(INSTRUCTION_STORAGE insn, uint32_t src_addr, std::string opname)
+#define GI INSTRUCTION_TYPE *getInstruction(uint8_t *buffer, uint32_t src_addr)

@@ -16,9 +16,12 @@ namespace disasm {
 			uint32_t rs = ((insn >> 10) & 0x0000000f);
 			int32_t offs = insn & 0x000003ff;
 			offs *= 2;
+
+			uint32_t target = src_addr + offs;
+
 			RV(NI(opname, "r{d}, r{a}, r{s}, {o}")
 				 ->addParameter("d", PR(rd))->addParameter("a", PR(ra))
-				 ->addParameter("s", PR(rs))->addParameter("o", PO(offs)));
+				 ->addParameter("s", PR(rs))->addParameter("o", P_I(target)));
 		}
 
 		DZ(addCmpBrRIRO) {
@@ -28,9 +31,11 @@ namespace disasm {
 			int32_t offs = insn & 0x000003ff;
 			offs *= 2;
 
+			uint32_t target = src_addr + offs;
+
 			RV(NI(opname, "r{d}, {i}, r{s}, {o}")
 				 ->addParameter("d", PR(rd))->addParameter("i", P_I(i))
-				 ->addParameter("s", PR(rs))->addParameter("o", PO(offs)));
+				 ->addParameter("s", PR(rs))->addParameter("o", P_I(target)));
 		}
 
 		DZ(addCmpBrRRIO) {
@@ -40,9 +45,11 @@ namespace disasm {
 			int32_t offs = insn & 0x000003ff;
 			offs *= 2;
 
+			uint32_t target = src_addr + offs;
+
 			RV(NI(opname, "r{d}, r{a}, {u}, {o}")
 				 ->addParameter("d", PR(rd))->addParameter("a", PR(ra))
-				 ->addParameter("u", P_I(u))->addParameter("o", PO(offs)));
+				 ->addParameter("u", P_I(u))->addParameter("o", P_I(target)));
 		}
 
 		DZ(addCmpBrRIIO) {
@@ -52,9 +59,11 @@ namespace disasm {
 			int32_t offs = insn & 0x000000ff;
 			offs *= 2;
 
+			uint32_t target = src_addr + offs;
+
 			RV(NI(opname, "r{d}, {i}, {u}, {o}")
 				 ->addParameter("d", PR(rd))->addParameter("i", P_I(i))
-				 ->addParameter("u", P_I(u))->addParameter("o", PO(offs)));
+				 ->addParameter("u", P_I(u))->addParameter("o", P_I(target)));
 		}
 
 		D(addCmpBr) {
@@ -65,13 +74,13 @@ namespace disasm {
 
 			switch( type ) {
 			case 0:
-				return addCmpBrRRRO(insn, opname);
+				return addCmpBrRRRO(insn, src_addr, opname);
 			case 1:
-				return addCmpBrRIRO(insn, opname);
+				return addCmpBrRIRO(insn, src_addr, opname);
 			case 2:
-				return addCmpBrRRIO(insn, opname);
+				return addCmpBrRRIO(insn, src_addr, opname);
 			case 3:
-				return addCmpBrRIIO(insn, opname);
+				return addCmpBrRIIO(insn, src_addr, opname);
 			default:
 				return new scalar32_insn("*unknown scalar32 addcmpbr<cc>*", "");
 			}
@@ -82,17 +91,18 @@ namespace disasm {
 			std::string opname("b");
 			opname += (insn & 0x00800000)?"l":condition_codes[((insn & 0x0f000000) >> 24)];
 			int32_t offs = insn & mask;
-			offs *= 4;
+			offs *= 2;
+			uint32_t target = src_addr + offs;
 
-			RV(NI(opname, "{o}")->addParameter("o", PO(offs)));
+			RV(NI(opname, "{o}")->addParameter("o", P_I(target)));
 		}
 
 		D(dispatchBranched) {
 			switch( (insn >> 24) & 0xf ) {
 			case 0x80:
-				return addCmpBr(insn);
+				return addCmpBr(insn, src_addr);
 			case 0x81:
-				return branch(insn);
+				return branch(insn, src_addr);
 			default:
 				return new scalar32_insn("*unknown scalar32 branch instruction*", "");
 			}
@@ -154,12 +164,12 @@ namespace disasm {
 
 		D(memoryAccessDispatch) {
 			uint8_t type = ((insn >> 20) & 0xf);
-			if (type == 0) return condIndexed(insn);
-			else if (type == 2 || type == 3) return loadStoreRRo(insn);
-			else if (type == 4) return condLSWIncDec(insn);
-			else if (type == 5) return condLSWIncDec(insn);
+			if (type == 0) return condIndexed(insn, src_addr);
+			else if (type == 2 || type == 3) return loadStoreRRo(insn, src_addr);
+			else if (type == 4) return condLSWIncDec(insn, src_addr);
+			else if (type == 5) return condLSWIncDec(insn, src_addr);
 			else if (type == 6 || type == 7) return new scalar32_insn("*unknown scalar32 memory access*", "");
-			else if (type == 8 || type == 9 || type == 10 || type == 11) return loadStoreOffset(insn);
+			else if (type == 8 || type == 9 || type == 10 || type == 11) return loadStoreOffset(insn, src_addr);
 			else return new scalar32_insn("*unknown scalar32 memory access*", "");
 		}
 
@@ -216,18 +226,18 @@ namespace disasm {
 			bool conditional = (((insn >> 24) & 0xf) == 0xc);
 			uint8_t check_code = ((insn >> 22) & 3);
 			if (conditional) {
-				if ((insn >> 6) & 1) return aluConditionalRRI(insn);
-				else return aluConditionalRRR(insn);
+				if ((insn >> 6) & 1) return aluConditionalRRI(insn, src_addr);
+				else return aluConditionalRRR(insn, src_addr);
 			} else {
 				switch(check_code) {
 				case 0:
-					return aluRegisterImmediate(insn);
+					return aluRegisterImmediate(insn, src_addr);
 				case 1:
-					return aluAddRRI(insn);
+					return aluAddRRI(insn, src_addr);
 				case 2:
 					return new scalar32_insn("*unknown scalar32 alu*", "");
 				case 3:
-					return aluAddRPCO(insn);
+					return aluAddRPCO(insn, src_addr);
 				default:
 					return new scalar32_insn("*unknown scalar32 alu*", "");
 				}
@@ -258,8 +268,8 @@ namespace disasm {
 		}
 
 		D(floatOpDispatch) {
-			if ( (insn >> 6) & 1 ) return floatOpRRI(insn);
-			else return floatOpRRR(insn);
+			if ( (insn >> 6) & 1 ) return floatOpRRI(insn, src_addr);
+			else return floatOpRRR(insn, src_addr);
 		}
 
 		D(floatTruncRRR) {
@@ -359,44 +369,44 @@ namespace disasm {
 		}
 
 		D(floatTrunc) {
-			if( (insn >> 6) & 1 ) return floatTruncRRI(insn);
-			else return floatTruncRRR(insn);
+			if( (insn >> 6) & 1 ) return floatTruncRRI(insn, src_addr);
+			else return floatTruncRRR(insn, src_addr);
 		}
 
 		D(floatFloor) {
-			if( (insn >> 6) & 1 ) return floatFloorRRI(insn);
-			else return floatFloorRRR(insn);
+			if( (insn >> 6) & 1 ) return floatFloorRRI(insn, src_addr);
+			else return floatFloorRRR(insn, src_addr);
 		}
 
 		D(floatFLTS) {
-			if( (insn >> 6) & 1 ) return floatFLTSRRI(insn);
-			else return floatFLTSRRR(insn);
+			if( (insn >> 6) & 1 ) return floatFLTSRRI(insn, src_addr);
+			else return floatFLTSRRR(insn, src_addr);
 		}
 
 		D(floatFLTU) {
-			if( (insn >> 6) & 1 ) return floatFLTURRI(insn);
-			else return floatFLTURRR(insn);
+			if( (insn >> 6) & 1 ) return floatFLTURRI(insn, src_addr);
+			else return floatFLTURRR(insn, src_addr);
 		}
 
 		D(floatDispatchConvert) {
 			if (((insn >> 22) & 1) == 1) return new scalar32_insn("*unknown scalar32 (possible control register access)*", "");
 			switch( ((insn >> 21) & 3) ) {
 			case 0:
-				return floatTrunc(insn);
+				return floatTrunc(insn, src_addr);
 			case 1:
-				return floatFloor(insn);
+				return floatFloor(insn, src_addr);
 			case 2:
-				return floatFLTS(insn);
+				return floatFLTS(insn, src_addr);
 			case 3:
-				return floatFLTU(insn);
+				return floatFLTU(insn, src_addr);
 			default:
 				return new scalar32_insn("*unknown scalar32 (float int conversion)*", "");
 			}
 		}
 
 		D(floatDispatch) {
-			if ( (insn >> 26) & 1 ) return floatDispatchConvert(insn);
-			else return floatDispatchConvert(insn);
+			if ( (insn >> 26) & 1 ) return floatDispatchConvert(insn, src_addr);
+			else return floatDispatchConvert(insn, src_addr);
 		}
 
 		D(controlRegisterAccess) {
@@ -407,26 +417,31 @@ namespace disasm {
 			RV(NI("mov", fmt)->addParameter("a", PR(reg_dest))->addParameter("d", PR(reg_src)));
 		}
 
-		scalar32_insn *getInstruction(uint8_t *buffer) {
+		GI {
 			// read the instruction and check the type
 			// this should be possible by checking for
 			// certain bit-patterns
 			uint32_t insn_raw = READ_DWORD(buffer);
 			uint8_t insn_type = (insn_raw >> 28) ^ 0x08;
 
+			scalar32_insn *rv;
 			switch( insn_type ) {
 			case 0: // 0b000
 			case 1: // 0b001
-				return dispatchBranched(insn_raw);
+				rv = dispatchBranched(insn_raw, src_addr);
 			case 2: // 0b010
-				return memoryAccessDispatch(insn_raw);
+				rv = memoryAccessDispatch(insn_raw, src_addr);
 			case 3: // 0b011
 			case 4: // 0b100
-				if ( insn_raw >> 24 & 0x08 ) return floatDispatch(insn_raw);
-				else return aluDispatch(insn_raw);
+				if ( insn_raw >> 24 & 0x08 ) rv = floatDispatch(insn_raw, src_addr);
+				else rv = aluDispatch(insn_raw, src_addr);
 			default: // 0b101 only - 0b110 would be part of the size flags for SCALAR48
-				return new scalar32_insn("*unknown scalar32*", "");
+				rv = new scalar32_insn("*unknown scalar32*", "");
 			}
+			uint8_t srcData[4];
+			for( int i = 0; i < 4; i++ ) srcData[i] = (uint8_t)(*(buffer+i));
+			rv->setSourceData(srcData);
+			return rv;
 		}
 	}
 }

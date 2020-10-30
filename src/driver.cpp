@@ -17,6 +17,7 @@
 #include <cstdio>
 
 #include <iostream>
+#include <iomanip>
 
 #include <boost/format.hpp>
 
@@ -24,19 +25,19 @@ using namespace std;
 
 namespace disasm {
 	namespace scalar16 {
-		extern scalar16_insn *getInstruction(uint8_t *);
+		extern scalar16_insn *getInstruction(uint8_t *, uint32_t);
 	}
 	namespace scalar32 {
-		extern scalar32_insn *getInstruction(uint8_t *);
+		extern scalar32_insn *getInstruction(uint8_t *, uint32_t);
 	}
 	namespace scalar48 {
-		extern scalar48_insn *getInstruction(uint8_t *);
+		extern scalar48_insn *getInstruction(uint8_t *, uint32_t);
 	}
 	namespace vector48 {
-		extern vector48_insn *getInstruction(uint8_t *);
+		extern vector48_insn *getInstruction(uint8_t *, uint32_t);
 	}
 	namespace vector80 {
-		extern vector80_insn *getInstruction(uint8_t *);
+		extern vector80_insn *getInstruction(uint8_t *, uint32_t);
 	}
 }
 
@@ -92,15 +93,16 @@ int main(int argc, char *argv[]) {
 	std::cout << std::boolalpha;
 
 	while (work - buffer < st.st_size) {
+		uint32_t srcaddr = (work - buffer);
 		disasm::vc4_insn *ci;
 		uint16_t insn_raw = READ_WORD(work);
 		uint8_t qsz = (((uint8_t)(insn_raw >> 8)) & 0xf8) >> 3;
 
-		if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work);
-		else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work);
-		else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work);
-		else if ( qsz == 30 ) ci = disasm::vector48::getInstruction(work);
-		else if ( qsz == 31 ) ci = disasm::vector80::getInstruction(work);
+		if ( qsz < 16 ) ci = disasm::scalar16::getInstruction(work, srcaddr);
+		else if ( qsz >= 16 && qsz < 28 ) ci = disasm::scalar32::getInstruction(work, srcaddr);
+		else if ( qsz >= 28 && qsz < 30 ) ci = disasm::scalar48::getInstruction(work, srcaddr);
+		else if ( qsz == 30 ) ci = disasm::vector48::getInstruction(work, srcaddr);
+		else if ( qsz == 31 ) ci = disasm::vector80::getInstruction(work, srcaddr);
 		else { std::cerr << "bad size " << std::bitset<5>(qsz) << "!!!" << std::endl; abort(); }
 
 		int32_t foundLoc = ci->getReadable().find("unknown");
@@ -109,13 +111,17 @@ int main(int argc, char *argv[]) {
 		instructions.push_back(*ci);
 	}
 
-	uint32_t addr;
+	uint32_t addr = 0;
 	for ( auto it = instructions.begin(); it != instructions.end(); it++ ) {
 		disasm::vc4_insn curr = *it;
 
 		int32_t foundLoc = curr.getReadable().find("unknown");
 		bool known = !(foundLoc > 0);
-		std::cout << (boost::format { "0x%08X" } % addr ).str() << "\t" << curr.toString() << std::endl;
+		std::string srcBytes("");
+		for ( auto x : curr.getSourceData() )
+			srcBytes += (boost::format { "%02x" } % (uint16_t)x).str() + " ";
+
+		std::cout << std::setw(10) << (boost::format { "0x%08X" } % addr ).str() << std::setw(3) << " " << std::setw(32) << srcBytes << std::setw(2) << " " << std::setw(0) << curr.toString() << std::endl;
 	  addr += ((!known)?2:curr.getSizeBytes());
 	}
 }

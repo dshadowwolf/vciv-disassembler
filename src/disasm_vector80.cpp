@@ -188,10 +188,10 @@ namespace disasm {
 
     D(vector80memory) {
 			bool remove_reg = (((insn.mid >> 7) & 7) == 7);
-			if ( ((insn.mid >> 18) & 0x0e) == 0x0e && remove_reg) return v80rni(insn);
-			else if( ((insn.mid >> 28) & 0x0e) == 0x0e && remove_reg) return v80nri(insn);
-			else if( !remove_reg && ((insn.mid >> 10) & 1) == 0 ) return v80rrr(insn);
-			else if( !remove_reg && ((insn.mid >> 10) & 1) == 1 ) return v80rri(insn);
+			if ( ((insn.mid >> 18) & 0x0e) == 0x0e && remove_reg) return v80rni(insn, src_addr);
+			else if( ((insn.mid >> 28) & 0x0e) == 0x0e && remove_reg) return v80nri(insn, src_addr);
+			else if( !remove_reg && ((insn.mid >> 10) & 1) == 0 ) return v80rrr(insn, src_addr);
+			else if( !remove_reg && ((insn.mid >> 10) & 1) == 1 ) return v80rri(insn, src_addr);
 			return new vector80_insn("*unknown vector80", "");
 		}
 
@@ -229,15 +229,21 @@ namespace disasm {
 		D(vector80alu) {
 			bool check = (((insn.mid >> 10) & 1) == 1);
 
-			if( !check ) return v80arrr(insn);
-			else return v80arri(insn);
+			if( !check ) return v80arrr(insn, src_addr);
+			else return v80arri(insn, src_addr);
 		}
 
-		vector80_insn *getInstruction(uint8_t *buffer) {
+		GI {
 			v80_dmap insn(buffer);
+			vector80_insn *rv;
 
-			if ( (insn.first >> 10) & 1 ) return vector80alu(insn);
-			else return vector80memory(insn);
+			if ( (insn.first >> 10) & 1 ) rv = vector80alu(insn, src_addr);
+			else rv = vector80memory(insn, src_addr);
+
+			uint8_t srcData[10];
+			for( int i = 0; i < 10; i++ ) srcData[i] = (uint8_t)(*(buffer+i));
+			rv->setSourceData( srcData );
+			return rv;
 		}
 	}
 }

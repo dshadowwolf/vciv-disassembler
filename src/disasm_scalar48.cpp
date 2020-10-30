@@ -20,14 +20,9 @@ namespace disasm {
 		D(simpleBranch) {
 			int32_t offs = insn.arg;
 			std::string op(((insn.insn >> 9) & 3)?"bl":"b");
-			std::string s("+");
-			if (offs < 0) {
-				s = "-";
-				offs *= -1;
-			}
-
-			RV(NI(op, "$[[${s}{t}]]")
-				 ->addParameter("t", P_I(offs))->addParameter("s", PD(s)));
+			uint32_t target = src_addr + offs;
+			RV(NI(op, "{t}")
+				 ->addParameter("t", P_I(target)));
 		}
 
 		D(simpleJump) {
@@ -65,18 +60,18 @@ namespace disasm {
 			switch((insn.insn >> 8) & 0xf) {
 			case 0:
 			case 2:
-				return simpleBranch(insn);
+				return simpleBranch(insn, src_addr);
 			case 1:
 			case 3:
-				return simpleJump(insn);
+				return simpleJump(insn, src_addr);
 			case 4:
 				RV(NI("*unknown scalar48 simple*", ""));
 			case 5:
-				return pcRelAdd(insn);
+				return pcRelAdd(insn, src_addr);
 			case 6:
-				return loadStoreRel(insn);
+				return loadStoreRel(insn, src_addr);
 			case 7:
-				return loadStorePCRel(insn);
+				return loadStorePCRel(insn, src_addr);
 			default:
 				RV(NI("*unknown scalar48 simple*", ""));
 			}
@@ -98,14 +93,16 @@ namespace disasm {
 		}
 
 		D(dispatchALU) {
-			return ((insn.insn >> 10)&1)?aluRegRegImm(insn):aluRegImm(insn);
+			return ((insn.insn >> 10)&1)?aluRegRegImm(insn, src_addr):aluRegImm(insn, src_addr);
 		}
 
-
-		scalar48_insn *getInstruction(uint8_t *buffer) {
+		GI {
 			s48d i(buffer);
-
-			return (((i.insn >> 11) & 1)==1)?dispatchALU(i):simpleDispatch(i);
+			scalar48_insn *rv = (((i.insn >> 11) & 1)==1)?dispatchALU(i, src_addr):simpleDispatch(i, src_addr);
+			uint8_t srcData[6];
+			for( int i = 0; i < 6; i++ ) srcData[i] = (uint8_t)(*(buffer+i));
+			rv->setSourceData( srcData );
+			return rv;
 		}
 	}
 }

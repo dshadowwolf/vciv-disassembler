@@ -87,19 +87,14 @@ namespace disasm {
 		};
 
 		std::string make_format(v48_shared s, uint8_t type) {
-			std::string rv;
-			if (s.d != "DISCARD-IGNORE")
-				rv += "{D}{d}, ";
-			if (s.a != "DISCARD-IGNORE")
-				rv += "{A}{d}, ";
-
+			std::string rv( "{D}{d}, {A}, " );
+			
 			switch(type) {
 			case 1:
 				rv += "(r{rb}) ";
 				break;
 			case 2:
-				if (s.b != "DISCARD-IGNORE")
-					rv += "{B}{d} ";
+				rv += "{B}{d} ";
 			  break;
 			case 3:
 				rv += "{imm}";
@@ -159,25 +154,32 @@ namespace disasm {
 		}
 
 		D(v48m_dispatch) {
-			if (((insn >> 7) & 7) == 7) return vector48mrro(insn);
-			else if (((insn >> 10) & 1) == 0) return vector48mrrr(insn);
-			else return vector48mrri(insn);
+			if (((insn >> 7) & 7) == 7) return vector48mrro(insn, src_addr);
+			else if (((insn >> 10) & 1) == 0) return vector48mrrr(insn, src_addr);
+			else return vector48mrri(insn, src_addr);
 		}
 
 		D(v48d_dispatch) {
-			if (((insn >> 7) & 7) == 7) return vector48drro(insn);
-			else if (((insn >> 10) & 1) == 0) return vector48drrr(insn);
-			else return vector48drri(insn);
+			if (((insn >> 7) & 7) == 7) return vector48drro(insn, src_addr);
+			else if (((insn >> 10) & 1) == 0) return vector48drrr(insn, src_addr);
+			else return vector48drri(insn, src_addr);
 		}
 
-		vector48_insn *getInstruction(uint8_t *buffer) {
+		GI {
+			vector48_insn *rv;
+			uint8_t src[6];
 			uint64_t insn = READ_WORD(buffer);
 			insn <<= 16;
 			insn |= READ_WORD(buffer+2);
 			insn <<= 16;
 			insn |= READ_WORD(buffer+4);
-			if ((insn >> 42) & 1) return v48d_dispatch(insn);
-			else return v48m_dispatch(insn);
+			if ((insn >> 42) & 1) rv = v48d_dispatch(insn, src_addr);
+			else rv = v48m_dispatch(insn, src_addr);
+
+			for( int i = 0; i < 6; i++ ) src[i] = (uint8_t)(*(buffer+i));
+
+			rv->setSourceData( src );
+			return rv;
 		}
 	}
 }

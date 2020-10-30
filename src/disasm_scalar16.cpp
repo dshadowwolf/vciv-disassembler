@@ -12,7 +12,7 @@ using namespace std;
 
 namespace disasm {
 	namespace scalar16 {
-		scalar16_insn *getSimpleInsn(uint16_t insn) {
+		D(getSimpleInsn) {
 			scalar16_insn *rv;
 			std::any argv;
 			string noargs[] = { "bkpt", "nop", "sleep", "user", "ei", "di", "cbclr",
@@ -60,69 +60,69 @@ namespace disasm {
 			std::string fmt((rb == rm)?"r{b}, ({d})":"r{b}-r{m}, ({d})");
 			RV(NI(opname, fmt)->addParameter("b", PR(rb))
 				 ->addParameter("m", PR(rm))->addParameter("d", PD(spdir)));
-	}
+		}
 
-	D(loadStoreSPOffset) {
-		std::string opname((((insn >> 9) & 1) == 1)?"st":"ld");
-		std::string spd("sp");
-		int32_t offs = ((insn >> 4) & 0x001f) * 4;
-		uint32_t rd = insn & 0x000f;
+		D(loadStoreSPOffset) {
+			std::string opname((((insn >> 9) & 1) == 1)?"st":"ld");
+			std::string spd("sp");
+			int32_t offs = ((insn >> 4) & 0x001f) * 4;
+			uint32_t rd = insn & 0x000f;
 
-		if (offs < 0) {
-			spd += "-";
-			offs *= -1;
-		}	else spd += "+";
+			if (offs < 0) {
+				spd += "-";
+				offs *= -1;
+			}	else spd += "+";
 
-		RV(NI(opname, "r{d}, ({s}{o})")->addParameter("d", PR(rd))
-			 ->addParameter("s", PD(spd))->addParameter("o", PO(offs)));
-	}
+			RV(NI(opname, "r{d}, ({s}{o})")->addParameter("d", PR(rd))
+				 ->addParameter("s", PD(spd))->addParameter("o", PO(offs)));
+		}
 
-	D(loadStoreWidth) {
-		std::string opname((((insn >> 8) & 1) == 1)?"st":"ld");
-		opname += mem_op_widths[(insn >> 9) & 3];
-		uint32_t rd = insn & 0x000f;
-		uint32_t rs = (insn >> 4) & 0x000f;
-		RV(NI(opname, "r{d}, (r{s})")->addParameter("d", PR(rd))
-			 ->addParameter("s", PR(rs)));
-	}
+		D(loadStoreWidth) {
+			std::string opname((((insn >> 8) & 1) == 1)?"st":"ld");
+			opname += mem_op_widths[(insn >> 9) & 3];
+			uint32_t rd = insn & 0x000f;
+			uint32_t rs = (insn >> 4) & 0x000f;
+			RV(NI(opname, "r{d}, (r{s})")->addParameter("d", PR(rd))
+				 ->addParameter("s", PR(rs)));
+		}
 
-	D(addSPOffset) {
-		uint32_t rd = insn & 0x001f;
-		int32_t offs = (insn >> 5) & 0x001f;
-		offs *= 4;
+		D(addSPOffset) {
+			uint32_t rd = insn & 0x001f;
+			int32_t offs = (insn >> 5) & 0x001f;
+			offs *= 4;
 
-		RV(NI("add", "r{d}, sp, {o}")->addParameter("d", PR(rd))
-			 ->addParameter("o", PO(offs)));
-	}
+			RV(NI("add", "r{d}, sp, {o}")->addParameter("d", PR(rd))
+				 ->addParameter("o", PO(offs)));
+		}
 
-	D(branchWithCondition) {
-		std::string opname("b");
-		opname += condition_codes[(insn >> 7) & 7];
-		int32_t offs = insn & 0x007f;
-		offs *= 2;
-		RV(NI(opname, "{o}")->addParameter("o", PO(offs)));
-	}
+		D(branchWithCondition) {
+			std::string opname("b");
+			opname += condition_codes[(insn >> 7) & 7];
+			int32_t offs = insn & 0x007f;
+			offs *= 2;
+			RV(NI(opname, "{o}")->addParameter("o", PO(offs)));
+		}
 
-	D(loadStoreRegisterOffset) {
-		std::string opname((((insn >> 12) & 1) == 1)?"st":"ld");
-		uint32_t rd = insn & 0x000f;
-		uint32_t rs = (insn & 0x00f0) >> 4;
-		uint32_t u = ((insn & 0x0f00) >> 8) * 4;
-		RV(NI(opname, "r{d}, (r{s}+{u})")->addParameter("d", PR(rd))
-														 ->addParameter("s", PR(rs))->addParameter("u", P_I(u)));
-	}
+		D(loadStoreRegisterOffset) {
+			std::string opname((((insn >> 12) & 1) == 1)?"st":"ld");
+			uint32_t rd = insn & 0x000f;
+			uint32_t rs = (insn & 0x00f0) >> 4;
+			uint32_t u = ((insn & 0x0f00) >> 8) * 4;
+			RV(NI(opname, "r{d}, (r{s}+{u})")->addParameter("d", PR(rd))
+				 ->addParameter("s", PR(rs))->addParameter("u", P_I(u)));
+		}
 
-	scalar16_insn *getMemoryOperation(uint16_t insn) {
-		uint8_t c = (insn >> 7) & 0x007f;  // seven bits tells which op, overall
+		D(getMemoryOperation) {
+			uint8_t c = (insn >> 7) & 0x007f;  // seven bits tells which op, overall
 
-		if( c & 0x0100 ) return loadStoreRegisterOffset(insn);
-		else if( ((c & 0x0030) >> 4) == 3 ) return branchWithCondition(insn);
-		else if( c & 64 ) return addSPOffset(insn);
-		else if( c & 16 ) return loadStoreWidth(insn);
-		else if( c & 8 ) return loadStoreSPOffset(insn);
-		else if ( c & 4 ) return loadStoreRange(insn);
-		else return new scalar16_insn("*unknown scalar16 memory*", "");
-	}
+			if( c & 0x0100 ) return loadStoreRegisterOffset(insn, src_addr);
+			else if( ((c & 0x0030) >> 4) == 3 ) return branchWithCondition(insn, src_addr);
+			else if( c & 64 ) return addSPOffset(insn, src_addr);
+			else if( c & 16 ) return loadStoreWidth(insn, src_addr);
+			else if( c & 8 ) return loadStoreSPOffset(insn, src_addr);
+			else if ( c & 4 ) return loadStoreRange(insn, src_addr);
+			else return new scalar16_insn("*unknown scalar16 memory*", "");
+		}
 
 
 #define FOUR_BIT(x) (al_ops[((x)&0x000f) << 1])
@@ -153,21 +153,25 @@ namespace disasm {
 
 #undef FOUR_BIT
 #undef FIVE_BIT
-		
-		scalar16_insn *getArithLogical(uint16_t insn) {
+		D(getArithLogical) {
 			return ((insn&0x6000) == 0x6000)?
-				getArithOrLogicalRegisterImmediate(insn):
-				getArithOrLogicalRegisterRegister(insn);
+				getArithOrLogicalRegisterImmediate(insn, src_addr):
+				getArithOrLogicalRegisterRegister(insn, src_addr);
 		}
 
-		scalar16_insn *getInstruction(uint8_t *buffer) {
+		GI {
 			// read the instruction and check the type
 			// this should be possible by checking for
 			// certain bit-patterns
-			uint16_t insn_raw = READ_WORD(buffer);//(uint16_t)(*((uint16_t *)buffer));
-			if ( (insn_raw & 0xFF00) == 0 ) return getSimpleInsn(insn_raw);
-			else if ( (insn_raw & 0x4000) == 0 ) return getMemoryOperation(insn_raw);
-			else return getArithLogical(insn_raw);
+			uint16_t insn_raw = READ_WORD(buffer);
+			scalar16_insn *rv;
+			if ( (insn_raw & 0xFF00) == 0 ) rv = getSimpleInsn(insn_raw, src_addr);
+			else if ( (insn_raw & 0x4000) == 0 ) rv = getMemoryOperation(insn_raw, src_addr);
+			else rv = getArithLogical(insn_raw, src_addr);
+
+			uint8_t srcData[] = { (uint8_t)(*buffer), (uint8_t)(*(buffer+1)) };
+			rv->setSourceData( srcData );
+			return rv;
 		}
 	}
 }

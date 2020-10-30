@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <cstdint>
 #include <regex>
+#include <vector>
+#include <algorithm>
+
 // uncomment the following to disable all assert() checks
 // #define NDEBUG
 #include <cassert>
@@ -23,6 +26,7 @@ namespace disasm {
 		string name;
 		string format;
 		uint8_t size;
+		std::vector<uint8_t> src_bytes;
 		unordered_map<string, vc4_parameter> parameters;
 
 	public:
@@ -34,6 +38,16 @@ namespace disasm {
 		inline string getReadable() { return name; };
 		inline uint8_t getSize() { return size; }
 		inline size_t getSizeBytes() { return (size_t)(size / 8); };
+		inline void setSourceData( uint8_t bytes[] ) {
+			for( int i = 0; i < getSizeBytes(); i++ ) src_bytes.push_back(bytes[i]);
+		};
+
+		inline std::vector<uint8_t> getSourceData() {
+			std::vector<uint8_t> r;
+			std::copy(src_bytes.begin(), src_bytes.end(), std::back_inserter(r));
+			return r;
+		}
+
 		string toString() {
 			assert( format.length() > 0 && "No format string!");
 			string rv(format);
