@@ -29,6 +29,7 @@ Lastly the current system is a few small classes and a "big mess of methods in s
 
 ## Future Plans
 ### Immediate Plans
+Moving the decoders to a factory pattern with class (non-instance) methods and 
 Extension of the decoders so they store the bytes (as they appear in the instruction stream) that the instructions are composed of in the actual returned instruction. Alongside this will be some work to allow for those parameters that are signed to be handled internally as such (currently all integers, regardless of whether or not the VC-IV core would treat the value as signed, are treated as unsigned in the code). The latter change, specifically, is needed for places where the branch instruction actually encodes an PC relative offset, but decodes such into a direct address.
 
 ### Near Future
@@ -38,7 +39,7 @@ Conversion and testing for thread safety and re-entrancy concerns leading toward
 Implementation of a layer on top of the planned library for inspection and tracking of data related to the decoded instruction stream to assist in actual decompilation and not just disassembly.
 
 ## License
-Nominally I like to license code that I write under the MIT or 2-clause "Simplified" BSD licenses, as these offer more freedom to the end user, even as they violate some of the protected freedoms of the GPL family of licenses. At this time the license is undecided, though leaning towards MIT - any contributors should accept that this change will happen, even if the current license is "undecided" - so technically "all rights reserved".
+This code is licensed under the 3-clause "Simplified" BSD license instead of my usual choice of the MIT license because of the protection against being used for advertising that is the third clause of the chosen license.
 
 ## Closing
 In the end I work in bursts of inspiration followed by sometimes years long lulls in activity. It is also a preference of mine to leave any legalities that are not immediately necessary until such a time as a decision needs to be made about them, giving me a long time to think about things and get advice from any number of sources.
