@@ -429,14 +429,17 @@ namespace disasm {
 			case 0: // 0b000
 			case 1: // 0b001
 				rv = dispatchBranched(insn_raw, src_addr);
+				break;
 			case 2: // 0b010
 				rv = memoryAccessDispatch(insn_raw, src_addr);
+				break;
 			case 3: // 0b011
 			case 4: // 0b100
 				if ( insn_raw >> 24 & 0x08 ) rv = floatDispatch(insn_raw, src_addr);
 				else rv = aluDispatch(insn_raw, src_addr);
+				break;
 			default: // 0b101 only - 0b110 would be part of the size flags for SCALAR48
-				rv = new scalar32_insn("*unknown scalar32*", "");
+				rv = new scalar32_insn("*unknown scalar32 (starts 1101/0x0d)*", "");
 			}
 			uint8_t srcData[4];
 			for( int i = 0; i < 4; i++ ) srcData[i] = (uint8_t)(*(buffer+i));

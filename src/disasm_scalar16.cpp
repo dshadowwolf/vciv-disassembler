@@ -23,11 +23,11 @@ namespace disasm {
 			if (insn < 10) rv = new scalar16_insn(noargs[insn], "");
 			else if (insn >= 10 && insn <= 31) return new scalar16_insn("*unknown scalar16 simple*", "");
 			else if ((insn & 0x0080) && !(insn & 0x0040)) {
-				if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{d}");
-				else rv = new scalar16_insn("switch", "r{d}");
+				if (insn & 0x0020) rv = new scalar16_insn("switch.b", "r{p}");
+				else rv = new scalar16_insn("switch", "r{p}");
 				mask = 0x000f;
 			} else if ((insn & 0x0040)) {
-				if (insn & 0x0020) rv = new scalar16_insn("bl", "r{d}");
+				if (insn & 0x0020) rv = new scalar16_insn("bl", "r{p}");
 				else rv = new scalar16_insn("b", "r{p}");
 			} else if (insn & 0x0020)
 				rv = new scalar16_insn("swi", "r{p}");
@@ -98,7 +98,7 @@ namespace disasm {
 		D(branchWithCondition) {
 			std::string opname("b");
 			opname += condition_codes[(insn >> 7) & 7];
-			int32_t offs = insn & 0x007f;
+			int32_t offs = (int8_t)(insn & 0x7f);
 			offs *= 2;
 			RV(NI(opname, "{o}")->addParameter("o", PO(offs)));
 		}
